@@ -1,587 +1,562 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
-from io import BytesIO
+import io
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
-# ================================================================================
-# VERSION & BRANDING
-# ================================================================================
-APP_VERSION = "2.0 - MONETIZE SEAT 280 ONLY"
-APP_TITLE = "Monetize Guaranteed Media Planning"
+# Set page config
+st.set_page_config(
+    page_title="Monetize Media Planning",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# ================================================================================
-# CURRENCY MAPPING BY REGION
-# ================================================================================
-REGION_CURRENCY = {
-    "US": ("USD", "$"),
-    "CA": ("CAD", "$"),
-    "UK": ("GBP", "£"),
-    "DE": ("EUR", "€"),
-    "FR": ("EUR", "€"),
-    "NL": ("EUR", "€"),
-    "ES": ("EUR", "€"),
-    "IT": ("EUR", "€"),
-    "BE": ("EUR", "€"),
-    "AT": ("EUR", "€"),
-    "SE": ("EUR", "€"),
-    "AU": ("AUD", "$"),
-    "NZ": ("AUD", "$"),
-    "SG": ("SGD", "$"),
-    "IN": ("INR", "₹"),
-    "JP": ("JPY", "¥"),
-    "BR": ("BRL", "R$"),
-    "MX": ("MXN", "$"),
-}
+st.markdown("""
+<style>
+.main { padding: 2rem 1rem; }
+.stButton > button { width: 100%; }
+h1 { color: #0078D4; margin-bottom: 0.5rem; }
+</style>
+""", unsafe_allow_html=True)
 
-def get_currency_symbol(market):
-    """Get currency symbol based on market code."""
-    return REGION_CURRENCY.get(market.upper(), ("USD", "$"))[1]
+# Initialize session state
+if "num_flights" not in st.session_state:
+    st.session_state.num_flights = 1
 
-# ================================================================================
-# PRODUCT RULES - MONETIZE GUARANTEED ONLY (SEAT 280)
-# ================================================================================
-PRODUCT_RULES = {
+# Product rules for Monetize Seat 280
+PRODUCTS = {
     "Programmatic Guaranteed - First Impression": {
-        "publisher": "MSN",
-        "ad_formats": ["Banner"],
-        "device_scopes": ["All Devices", "Desktop", "Mobile"],
-        "line_item_type": "PG",
-        "priority": 7,
-        "revenue_type": "CPM",
-        "pacing": "ASAP",
-        "frequency_cap": "1 impression per user per day",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country targeting required",
-        "publisher_targeting": "KV pub = msn",
-        "seat": "280 - Monetize"
+        "formats": ["Banner"],
+        "priority": 7
     },
     "Programmatic Guaranteed - Standard": {
-        "publisher": ["MSN", "Outlook"],
-        "ad_formats": ["Banner", "Native"],
-        "device_scopes": ["All Devices", "Desktop", "Mobile"],
-        "line_item_type": "PG",
-        "priority": 5,
-        "revenue_type": "CPM",
-        "pacing": "Even",
-        "frequency_cap": "6 impressions per user per day",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": {
-            "MSN": "KV pub=msn",
-            "Outlook": "Direct Inventory - Outlook Native"
-        },
-        "seat": "280 - Monetize"
+        "formats": ["Banner", "Native"],
+        "priority": 5
     },
     "GDALI - Guaranteed Campaign (Impressions)": {
-        "publisher": ["MSN", "Outlook"],
-        "ad_formats": ["Banner", "Native"],
-        "device_scopes": ["All Devices", "Desktop", "Mobile"],
-        "line_item_type": "Guaranteed (GDALI)",
-        "priority": 5,
-        "revenue_type": "CPM",
-        "pacing": "Even",
-        "frequency_cap": "6 impressions per user per day",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": {
-            "MSN": "KV pub=msn",
-            "Outlook": "Direct Inventory - Outlook Native"
-        },
-        "seat": "280 - Monetize"
+        "formats": ["Banner", "Native", "Video"],
+        "priority": 5
     },
     "GDALI - Takeover (MSN Homepage)": {
-        "publisher": "MSN",
-        "ad_formats": ["Banner"],
-        "device_scopes": ["Desktop"],
-        "line_item_type": "Guaranteed (GDALI)",
-        "priority": 15,
-        "revenue_type": "Cost Per Day",
-        "pacing": "00:00 to 23:59",
-        "frequency_cap": "Off",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn, sales_page_type=homepage",
-        "seat": "280 - Monetize"
-    },
-    "GDALI - Takeover (Outlook Banner)": {
-        "publisher": "Outlook",
-        "ad_formats": ["Banner"],
-        "device_scopes": ["Desktop"],
-        "line_item_type": "Guaranteed (GDALI)",
-        "priority": 15,
-        "revenue_type": "Cost Per Day",
-        "pacing": "00:00 to 23:59",
-        "frequency_cap": "Off",
-        "inventory_type": "Banner",
-        "geo_targeting": "None",
-        "publisher_targeting": "Outlook Banner",
-        "seat": "280 - Monetize"
+        "formats": ["Banner"],
+        "priority": 15
     },
     "GDALI - Takeover (Outlook Native)": {
-        "publisher": "Outlook",
-        "ad_formats": ["Native"],
-        "device_scopes": ["All Devices"],
-        "line_item_type": "Guaranteed (GDALI)",
-        "priority": 15,
-        "revenue_type": "Cost Per Day",
-        "pacing": "00:00 to 23:59",
-        "frequency_cap": "Off",
-        "inventory_type": "Native",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "Publisher=Outlook Native (1000230)",
-        "seat": "280 - Monetize"
+        "formats": ["Native"],
+        "priority": 15
     },
     "PG - High Impact": {
-        "publisher": "MSN",
-        "ad_formats": ["Banner"],
-        "device_scopes": ["Desktop"],
-        "line_item_type": "PG",
-        "priority": 15,
-        "revenue_type": "CPM",
-        "pacing": "Even",
-        "frequency_cap": "Off",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn",
-        "seat": "280 - Monetize"
+        "formats": ["Banner"],
+        "priority": 15
     }
 }
 
-# ================================================================================
-# HELPER FUNCTIONS
-# ================================================================================
-def get_compatible_formats(product, publisher="MSN"):
-    """Get compatible formats based on product and publisher."""
-    # Outlook is Native only
-    if publisher == "Outlook":
-        return ["Native"]
-    # MSN has all formats
-    return ["Banner", "Native", "Video"]
+DEVICE_MAPPING = {
+    "Desktop": "D",
+    "Mobile": "M",
+    "Tablet": "T"
+}
 
-def get_compatible_devices(product):
-    return PRODUCT_RULES[product]["device_scopes"]
+CURRENCY_MAP = {
+    "US": "$", "CA": "$", "UK": "£", "DE": "€", "FR": "€", 
+    "NL": "€", "ES": "€", "IT": "€", "AU": "$", "NZ": "$", 
+    "SG": "$", "IN": "₹", "JP": "¥"
+}
 
-def get_publisher_targeting(product, publisher):
-    """Get the correct publisher targeting based on product and selected publisher."""
-    rules = PRODUCT_RULES[product]
-    pub_target = rules.get("publisher_targeting", "")
-    
-    # If publisher_targeting is a dict, get the value for the selected publisher
-    if isinstance(pub_target, dict):
-        return pub_target.get(publisher, "Not available for this publisher")
-    
-    # Otherwise return the string value
-    return pub_target
+# Helper functions
+def get_currency(market):
+    return CURRENCY_MAP.get(market, "$")
 
-def generate_o_o_taxonomy(market, publisher, product, ad_format, device):
-    """O&O Naming Taxonomy"""
-    device_clean = device.replace(" ", "")
-    if "First Impression" in product:
-        return f"{market}_{publisher}_First Impression_{ad_format}_{device_clean}_PG_Imps"
-    elif "High Impact" in product:
-        return f"{market}_{publisher}_High Impact_{ad_format}_{device_clean}_PG_Imps"
-    elif "Takeover" in product:
-        return f"{market}_{publisher}_Takeover_{ad_format}_{device_clean}_GDALI_SOV"
-    elif "Standard" in product:
-        return f"{market}_{publisher}_Standard_{ad_format}_{device_clean}_PG_Imps"
+def get_targeting(pub, prod):
+    """Dynamic targeting based on publisher"""
+    if pub == "Outlook":
+        return "Direct Inventory"
     else:
-        return f"{market}_{publisher}_{product}_{ad_format}_{device_clean}"
+        return "KV pub=msn"
 
-def generate_li_name(market, publisher, product, ad_format, device):
-    """Line Item Name"""
-    device_clean = device.replace(" ", "")
-    prod_label = product.split("-")[0].strip() if "-" in product else product
-    return f"{market}_{publisher}_{prod_label}_{ad_format}_{device_clean}"
+def gen_taxonomy(advertiser, market, pub, fmt):
+    """Generate taxonomy with advertiser"""
+    return f"{advertiser}_{market}_{pub}_{fmt}"
 
-def calculate_flight_days(start, end):
+def gen_li_name(advertiser, market, pub, fmt, device):
+    """Line item naming convention"""
+    device_code = DEVICE_MAPPING.get(device, "D")
+    return f"{advertiser}_{market}_{pub}_{fmt}_{device_code}"
+
+def calc_days(start, end):
+    """Calculate days between dates"""
     return (end - start).days + 1
 
-def calculate_cost(volume, rate, is_takeover, flight_days=1):
-    if is_takeover:
-        return flight_days * rate
-    return (volume / 1000) * rate
+def calc_cost(vol, rate, is_cpd, days=1):
+    """Calculate cost without discounts"""
+    if is_cpd:
+        return days * rate
+    else:
+        return (vol / 1000) * rate
 
-def create_excel_export(flights_list):
-    """Create Excel file with multiple flights/campaigns."""
+def make_excel(flights_list, campaign_info):
+    """Create Microsoft Advertising style Excel"""
     wb = Workbook()
     ws = wb.active
-    ws.title = "MediaPlan"
+    ws.title = "Campaign"
     
-    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=10)
-    border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                   top=Side(style='thin'), bottom=Side(style='thin'))
+    # Set up formatting
+    header_fill = PatternFill(start_color="0078D4", end_color="0078D4", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
     
-    headers = ["Advertiser", "Campaign", "Market", "Publisher", "Product", 
-               "Format", "Device", "Start", "End", "Rate Type", 
-               "Rate", "Volume", "Total Cost", "O&O Taxonomy"]
+    # Title section
+    ws.merge_cells("A1:H1")
+    title_cell = ws["A1"]
+    title_cell.value = "Microsoft Advertising Campaign"
+    title_cell.font = Font(bold=True, size=14, color="0078D4")
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
     
-    for i, h in enumerate(headers, 1):
-        cell = ws.cell(1, i)
-        cell.value = h
+    # Campaign info section
+    ws["A2"] = "Campaign Name"
+    ws["B2"] = campaign_info["campaign"]
+    ws["A3"] = "Advertiser"
+    ws["B3"] = campaign_info["advertiser"]
+    ws["A4"] = "Market"
+    ws["B4"] = campaign_info["market"]
+    ws["C4"] = "Publisher"
+    ws["D4"] = campaign_info["publisher"]
+    
+    # Data headers
+    headers = ["Flight #", "Product", "Format", "Device", "Inventory", "Start Date", 
+               "End Date", "Volume/Budget", "Rate", "Currency", "Cost"]
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=5, column=col)
+        cell.value = header
         cell.fill = header_fill
         cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
-        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     
-    # Add rows for each flight
-    for row_idx, flight in enumerate(flights_list, 2):
-        flight_days = flight.get("flight_days", calculate_flight_days(flight["start_date"], flight["end_date"]))
-        is_takeover = "Takeover" in flight["product"]
-        rate_type = "CPD" if is_takeover else "CPM"
-        volume = flight_days if is_takeover else flight.get("volume", 0)
-        total_cost = flight.get("total_cost", calculate_cost(flight.get("volume", 0), flight["rate"], is_takeover, flight_days))
-        currency = flight.get("currency", get_currency_symbol(flight["market"]))
+    # Data rows
+    for row_idx, flight in enumerate(flights_list, 6):
+        ws.cell(row=row_idx, column=1).value = flight.get("flight_num", 1)
+        ws.cell(row=row_idx, column=2).value = flight["product"]
+        ws.cell(row=row_idx, column=3).value = flight["format"]
+        ws.cell(row=row_idx, column=4).value = flight["device"]
+        ws.cell(row=row_idx, column=5).value = flight["inventory"]
+        ws.cell(row=row_idx, column=6).value = flight["start"].strftime("%m/%d/%Y")
+        ws.cell(row=row_idx, column=7).value = flight["end"].strftime("%m/%d/%Y")
+        ws.cell(row=row_idx, column=8).value = flight["volume"]
+        ws.cell(row=row_idx, column=9).value = flight["rate"]
+        ws.cell(row=row_idx, column=10).value = flight["currency"]
+        ws.cell(row=row_idx, column=11).value = flight["cost"]
         
-        row_data = [
-            flight["advertiser"],
-            flight["campaign"],
-            flight["market"],
-            flight["publisher"],
-            flight["product"],
-            flight["format"],
-            flight["device"],
-            flight["start_date"].strftime("%Y-%m-%d"),
-            flight["end_date"].strftime("%Y-%m-%d"),
-            rate_type,
-            f"{currency}{flight['rate']:.2f}",
-            f"{volume:,.0f}" if isinstance(volume, int) else volume,
-            f"{currency}{total_cost:,.2f}",
-            flight.get("taxonomy", "")
-        ]
-        
-        for col_idx, val in enumerate(row_data, 1):
-            cell = ws.cell(row_idx, col_idx)
-            cell.value = val
-            cell.border = border
-            cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        for col in range(1, 12):
+            ws.cell(row=row_idx, column=col).border = border
+    
+    # Freeze panes
+    ws.freeze_panes = "A5"
     
     # Set column widths
-    for i in range(1, len(headers) + 1):
-        col_letter = get_column_letter(i)
-        ws.column_dimensions[col_letter].width = 16
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 15
+    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["E"].width = 20
+    ws.column_dimensions["F"].width = 12
+    ws.column_dimensions["G"].width = 12
+    ws.column_dimensions["H"].width = 15
+    ws.column_dimensions["I"].width = 10
+    ws.column_dimensions["J"].width = 12
+    ws.column_dimensions["K"].width = 12
     
-    ws.freeze_panes = "A2"
     return wb
 
-# ================================================================================
-# STREAMLIT CONFIGURATION
-# ================================================================================
-st.set_page_config(page_title=APP_TITLE, layout="wide", initial_sidebar_state="collapsed")
+def make_pdf(flights_list, campaign_info):
+    """Create comprehensive PDF report with all 8 sections"""
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Define custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#0078D4'),
+        spaceAfter=6,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#0078D4'),
+        spaceAfter=10,
+        spaceBefore=10,
+        fontName='Helvetica-Bold'
+    )
+    
+    # ========== SECTION 1: HEADER / VERSIONING ==========
+    story.append(Paragraph("Monetize Guaranteed Media Planning", title_style))
+    story.append(Paragraph("Version 2.0 – MONETIZE SEAT 280 ONLY", styles['Normal']))
+    story.append(Paragraph("<b>⚠️ CPM rates must be aligned with DNV Rate Card</b>", styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 2: CAMPAIGN DETAILS ==========
+    story.append(Paragraph("1. Campaign Details", heading_style))
+    campaign_data = [
+        ["Market", campaign_info["market"], "Advertiser", campaign_info["advertiser"]],
+        ["Campaign", campaign_info["campaign"], "Publisher", campaign_info["publisher"]],
+        ["Device", flights_list[0]["device"] if flights_list else "N/A", "Format", flights_list[0]["format"] if flights_list else "N/A"],
+        ["Start Date", flights_list[0]["start"].strftime("%Y-%m-%d") if flights_list else "N/A", 
+         "End Date", flights_list[-1]["end"].strftime("%Y-%m-%d") if flights_list else "N/A"]
+    ]
+    campaign_table = Table(campaign_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+    campaign_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F0F0F0')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+    ]))
+    story.append(campaign_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 3: O&O NAMING TAXONOMY ==========
+    story.append(Paragraph("2. O&O Naming Taxonomy", heading_style))
+    if flights_list:
+        flight = flights_list[0]
+        taxonomy = f"{campaign_info['advertiser']}_{campaign_info['market']}_{campaign_info['publisher']}_{flight['format']}"
+        line_item = f"{campaign_info['advertiser']}_{campaign_info['market']}_{campaign_info['publisher']}_{flight['format']}_{DEVICE_MAPPING.get(flight['device'], 'D')}"
+        taxonomy_data = [
+            ["Taxonomy", taxonomy],
+            ["Line Item Name", line_item]
+        ]
+        taxonomy_table = Table(taxonomy_data, colWidths=[2*inch, 4.5*inch])
+        taxonomy_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E8F4F8')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+        story.append(taxonomy_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 4: PRICING ==========
+    story.append(Paragraph("3. Pricing & Booking Math", heading_style))
+    if flights_list:
+        flight = flights_list[0]
+        pricing_data = [
+            ["Rate Type", "CPM" if "CPM" in flight["rate_type"] else "CPD"],
+            ["Rate", f"{flight['currency']}{flight['rate']:.2f}"],
+            ["Impressions/Days", f"{flight['volume']:,}"],
+            ["Total Cost", f"{flight['currency']}{flight['cost']:,.2f}"]
+        ]
+        pricing_table = Table(pricing_data, colWidths=[2*inch, 2*inch])
+        pricing_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E8F4F8')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+        story.append(pricing_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 5: TARGETING RULES ==========
+    story.append(Paragraph("4. Targeting Rules (Product-Locked)", heading_style))
+    if flights_list:
+        flight = flights_list[0]
+        targeting_data = [
+            ["Seat", "280 - Monetize"],
+            ["Priority", str(PRODUCTS.get(flight['product'], {}).get('priority', 'N/A'))],
+            ["Frequency Cap", "1/day" if "First Impression" in flight['product'] else "6/day"],
+            ["Pacing", "ASAP" if "First Impression" in flight['product'] else "Even"],
+            ["Inventory Type", flight["inventory"]],
+            ["Geo Targeting", "Country required"],
+            ["Publisher Targeting", "KV pub=msn" if "MSN" in campaign_info['publisher'] else "Direct Inventory"],
+            ["Revenue Type", flight["rate_type"].split("(")[0].strip()]
+        ]
+        targeting_table = Table(targeting_data, colWidths=[2.5*inch, 3.5*inch])
+        targeting_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E8F4F8')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+        story.append(targeting_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 6: MONETIZE SETUP CHECKLIST ==========
+    story.append(PageBreak())
+    story.append(Paragraph("5. Monetize Setup Summary", heading_style))
+    if flights_list:
+        flight = flights_list[0]
+        setup_text = f"<b>✓ Seat 280</b> | <b>✓ PG</b> | <b>✓ Priority {PRODUCTS.get(flight['product'], {}).get('priority', 'N/A')}</b> | <b>✓ {flight['format']}</b> | <b>✓ Country Geo</b> | <b>✓ {campaign_info['publisher']} Inventory</b>"
+        story.append(Paragraph(setup_text, styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 7: MULTIPLE FLIGHTS ==========
+    story.append(Paragraph("6. Media Plan (Flights)", heading_style))
+    if flights_list:
+        flight_headers = ["Flight", "Product", "Format", "Start", "End", "Volume", "Rate", "Cost"]
+        flight_rows = []
+        for idx, flight in enumerate(flights_list, 1):
+            flight_rows.append([
+                str(idx),
+                flight['product'][:20] + "..." if len(flight['product']) > 20 else flight['product'],
+                flight['format'],
+                flight['start'].strftime("%m/%d"),
+                flight['end'].strftime("%m/%d"),
+                f"{flight['volume']:,}",
+                f"{flight['currency']}{flight['rate']:.2f}",
+                f"{flight['currency']}{flight['cost']:,.2f}"
+            ])
+        flight_data = [flight_headers] + flight_rows
+        flight_table = Table(flight_data, colWidths=[0.6*inch, 2*inch, 0.9*inch, 0.8*inch, 0.8*inch, 1*inch, 0.8*inch, 1*inch])
+        flight_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0078D4')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+        story.append(flight_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # ========== SECTION 8: EXPORT FOOTER ==========
+    story.append(Paragraph("7. Summary & Export", heading_style))
+    if flights_list:
+        total_cost = sum(f['cost'] for f in flights_list)
+        total_volume = sum(f['volume'] for f in flights_list)
+        currency = flights_list[0]['currency']
+        summary_data = [
+            ["Total Flights", str(len(flights_list))],
+            ["Total Impressions", f"{total_volume:,}"],
+            ["Total Cost", f"{currency}{total_cost:,.2f}"],
+            ["Avg CPM", f"{currency}{(total_cost/total_volume*1000) if total_volume > 0 else 0:.2f}"]
+        ]
+        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#0078D4')),
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.black),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+        story.append(summary_table)
+    
+    story.append(Spacer(1, 0.3*inch))
+    footer = f"<b>Monetize Seat 280 – Guaranteed Delivery Only</b><br/>Last Updated: {datetime.now().strftime('%B %d, %Y')}<br/>✓ CPM rates aligned with DNV Rate Card"
+    story.append(Paragraph(footer, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
-# Initialize session state for multiple flights
-if "flights" not in st.session_state:
-    st.session_state.flights = []
-
-# Header with version
-st.markdown(f"# 🎯 {APP_TITLE}")
-st.markdown(f"**Version:** {APP_VERSION}", help="Monetize Seat 280 | Guaranteed Delivery Only | No PMP | No Curate")
-st.info("💡 **CPM rates must be aligned with DNV Rate Card**")
+# Main UI
+st.title("📊 Microsoft Advertising Monetize Media Planning")
+st.markdown("**Seat 280 - Guaranteed Media Planner**")
 st.divider()
 
-# ================================================================================
-# SECTION 1: CAMPAIGN DETAILS - MINIMALIST 4-COLUMN LAYOUT
-# ================================================================================
-st.subheader("📋 Campaign Details")
+# Campaign section
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    advertiser = st.text_input("Advertiser", help="Campaign advertiser")
+with col2:
+    campaign = st.text_input("Campaign Name", help="Campaign identifier")
+with col3:
+    market = st.selectbox("Market", list(CURRENCY_MAP.keys()), help="Target market")
+with col4:
+    publisher = st.selectbox("Publisher", ["Outlook", "MSN"], help="Publisher selection")
 
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    market = st.text_input("Market", value="UK", placeholder="e.g. UK, US, DE")
-with c2:
-    advertiser = st.text_input("Advertiser", value="Acme Corp")
-with c3:
-    campaign = st.text_input("Campaign", value="Q1 2026")
-with c4:
-    pub = st.selectbox("Publisher", ["MSN", "Outlook"])
-
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    product = st.selectbox("Product", [
-        "Programmatic Guaranteed - First Impression",
-        "Programmatic Guaranteed - Standard",
-        "PG - High Impact",
-        "GDALI - Guaranteed Campaign (Impressions)",
-        "GDALI - Takeover (MSN Homepage)",
-        "GDALI - Takeover (Outlook Banner)",
-        "GDALI - Takeover (Outlook Native)"
-    ])
-with c2:
-    device = st.selectbox("Device", get_compatible_devices(product))
-with c3:
-    fmt = st.selectbox("Format", get_compatible_formats(product, pub))
-with c4:
-    start_date = st.date_input("Start Date")
-
-end_date = st.date_input("End Date")
-
-# ================================================================================
-# SECTION 2: O&O NAMING TAXONOMY
-# ================================================================================
-st.subheader("📝 O&O Naming Taxonomy")
-
-taxonomy = generate_o_o_taxonomy(market, pub, product, fmt, device)
-li_name = generate_li_name(market, pub, product, fmt, device)
-
-tax_col1, tax_col2 = st.columns(2)
-with tax_col1:
-    st.code(taxonomy, language="text")
-with tax_col2:
-    st.code(li_name, language="text")
-
-# ================================================================================
-# SECTION 3: PRICING WITH CURRENCY
-# ================================================================================
-st.subheader("💰 Pricing")
-
-rules = PRODUCT_RULES[product]
-currency = get_currency_symbol(market)
-is_takeover = "Takeover" in product
-
-price_col1, price_col2 = st.columns(2)
-
-volume = 0
-with price_col1:
-    if is_takeover:
-        st.markdown("**Rate Type**")
-        st.write("Cost Per Day")
-        daily_rate = st.number_input(f"Daily Rate ({currency})", value=100.0, min_value=0.01, step=1.0)
-        rate = daily_rate
-    else:
-        st.markdown("**Rate Type**")
-        st.write("CPM")
-        cpm = st.number_input(f"CPM ({currency})", value=10.0, min_value=0.01, step=0.50)
-        impressions = st.number_input("Impressions", value=100000, min_value=1, step=1000)
-        rate = cpm
-        volume = impressions
-
-# ================================================================================
-# SECTION 4: TARGETING RULES (PRODUCT-LOCKED)
-# ================================================================================
-st.subheader("🔒 Targeting Rules (Locked by Product)")
-
-tgt_col1, tgt_col2, tgt_col3 = st.columns(3)
-
-with tgt_col1:
-    st.markdown(f"**Seat:** {rules['seat']}")
-    st.markdown(f"**Priority:** {rules['priority']}")
-    st.markdown(f"**Frequency Cap:** {rules['frequency_cap']}")
-
-with tgt_col2:
-    st.markdown(f"**Pacing:** {rules['pacing']}")
-    st.markdown(f"**Inventory Type:** {rules['inventory_type']}")
-    st.markdown(f"**Geo Targeting:** {rules['geo_targeting']}")
-
-with tgt_col3:
-    st.markdown(f"**Publisher Targeting:** {get_publisher_targeting(product, pub)}")
-    st.markdown(f"**Line Item Type:** {rules['line_item_type']}")
-    st.markdown(f"**Revenue Type:** {rules['revenue_type']}")
-
-# ================================================================================
-# SECTION 5: PLAN SUMMARY & EXPORT
-# ================================================================================
 st.divider()
-st.subheader("📊 Plan Summary")
 
-# Validation
-if end_date < start_date:
-    st.error("❌ End Date must be >= Start Date")
-    st.stop()
+# Product & Format section
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    product = st.selectbox("Product", list(PRODUCTS.keys()), help="Guaranteed product type")
+with col2:
+    available_formats = PRODUCTS[product]["formats"]
+    format_select = st.selectbox("Format/Inventory", available_formats, help="Creative format")
+with col3:
+    device = st.selectbox("Device", list(DEVICE_MAPPING.keys()), help="Target device")
+with col4:
+    currency = get_currency(market)
+    st.metric("Currency", currency)
 
-flight_days = calculate_flight_days(start_date, end_date)
-total_cost = calculate_cost(volume, rate, is_takeover, flight_days)
+# Show dynamic targeting
+col1, col2 = st.columns(2)
+with col1:
+    targeting = get_targeting(publisher, product)
+    st.info(f"**Inventory Type:** {targeting}")
 
-summary_cols = {
-    "Market": market,
-    "Publisher": pub,
-    "Product": product[:35],
-    "Format": fmt,
-    "Device": device,
-    "Start": start_date.strftime("%Y-%m-%d"),
-    "End": end_date.strftime("%Y-%m-%d"),
-    "Days": flight_days,
-    "Rate Type": "CPD" if is_takeover else "CPM",
-    "Rate": f"{currency}{rate:.2f}",
-    "Volume": f"{volume:,.0f}" if not is_takeover else f"{flight_days} days",
-    "Total Cost": f"{currency}{total_cost:,.2f}",
-    "O&O Taxonomy": taxonomy
-}
+st.divider()
 
-summary_df = pd.DataFrame([summary_cols])
-st.dataframe(summary_df, use_container_width=True, hide_index=True)
+# Flights section
+col1, col2 = st.columns(2)
+with col1:
+    multi_flight = st.checkbox("Add Multiple Flights", value=False, help="Enable multi-flight planning")
 
-# Monetize Setup
-st.subheader("⚙️ Monetize Setup")
-setup_text = f"""
-• **Seat:** {rules['seat']}
-• **Line Item Type:** {rules['line_item_type']}
-• **Delivery:** {'Exclusive' if is_takeover else 'Standard'}
-• **Priority:** {rules['priority']}
-• **Pacing:** {rules['pacing']}
-• **Frequency Cap:** {rules['frequency_cap']}
-• **Publisher Targeting:** {get_publisher_targeting(product, pub)}
-• **Inventory Type:** {rules['inventory_type']}
-• **Geo Targeting:** {rules['geo_targeting']}
-"""
-st.markdown(setup_text)
+if multi_flight:
+    st.session_state.num_flights = st.number_input("Number of Flights", min_value=1, max_value=12, value=1)
+else:
+    st.session_state.num_flights = 1
 
-# ================================================================================
-# MULTIPLE FLIGHTS SECTION
-# ================================================================================
-st.subheader("✈️ Manage Multiple Flights")
+st.divider()
 
-# Campaign base details (same for all flights)
-st.markdown(f"**Campaign Structure:** {product} | {fmt} | {device} | {pub}")
-st.markdown("---")
+flights_data = []
 
-# Section to add new flights with different dates and budgets
-st.markdown("**➕ Add New Flight (Same Product, Different Dates & Budget)**")
+for flight_num in range(1, st.session_state.num_flights + 1):
+    st.markdown(f"**Flight {flight_num}**")
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        start_date = st.date_input(f"Start Date", key=f"start_{flight_num}")
+    with col2:
+        end_date = st.date_input(f"End Date", key=f"end_{flight_num}")
+    with col3:
+        rate = st.number_input(f"Rate ({currency})", min_value=0.0, value=10.0, key=f"rate_{flight_num}")
+    with col4:
+        volume = st.number_input(f"Volume/Impressions", min_value=0, value=100000, key=f"volume_{flight_num}")
+    with col5:
+        rate_type = st.selectbox("Type", ["CPM (Cost per 1K)", "CPD (Cost per Day)"], key=f"type_{flight_num}")
+    
+    is_cpd = "CPD" in rate_type
+    days = calc_days(start_date, end_date)
+    cost = calc_cost(volume, rate, is_cpd, days)
+    
+    flights_data.append({
+        "flight_num": flight_num,
+        "product": product,
+        "format": format_select,
+        "device": device,
+        "inventory": get_targeting(publisher, product),
+        "start": start_date,
+        "end": end_date,
+        "volume": volume,
+        "rate": rate,
+        "currency": currency,
+        "cost": cost,
+        "days": days,
+        "rate_type": rate_type
+    })
+    
+    st.caption(f"Duration: {days} days | Cost: {currency}{cost:,.2f}")
+    st.divider()
 
-new_flight_col1, new_flight_col2, new_flight_col3, new_flight_col4 = st.columns(4)
-
-with new_flight_col1:
-    new_start = st.date_input("Flight Start Date", value=start_date, key="new_start")
-
-with new_flight_col2:
-    new_end = st.date_input("Flight End Date", value=end_date, key="new_end")
-
-with new_flight_col3:
-    if "Takeover" in product:
-        new_rate = st.number_input(f"Daily Rate ({currency})", value=rate, min_value=0.01, step=1.0, key="new_rate")
-        new_volume = 0
-    else:
-        new_rate = st.number_input(f"CPM ({currency})", value=rate, min_value=0.01, step=0.50, key="new_rate")
-        new_volume = st.number_input("Impressions", value=volume, min_value=1, step=1000, key="new_volume")
-
-with new_flight_col4:
-    add_flight_btn = st.button("➕ Add This Flight", use_container_width=True)
-
-if add_flight_btn:
-    if new_end < new_start:
-        st.error("❌ Flight End Date must be >= Start Date")
-    else:
-        new_flight_days = calculate_flight_days(new_start, new_end)
-        new_total_cost = calculate_cost(new_volume, new_rate, "Takeover" in product, new_flight_days)
-        
-        flight_data = {
+# Summary and export
+if advertiser and campaign and flights_data:
+    total_cost = sum(f["cost"] for f in flights_data)
+    total_volume = sum(f["volume"] for f in flights_data)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Flights", len(flights_data))
+    with col2:
+        st.metric("Total Volume", f"{total_volume:,}")
+    with col3:
+        st.metric("Total Cost", f"{currency}{total_cost:,.2f}")
+    with col4:
+        st.metric("Avg Rate", f"{currency}{(total_cost/total_volume*1000) if total_volume > 0 else 0:.2f}/K")
+    
+    st.divider()
+    
+    # Export section
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        campaign_info = {
             "advertiser": advertiser,
             "campaign": campaign,
-            "publisher": pub,
-            "product": product,
-            "format": fmt,
-            "device": device,
-            "start_date": new_start,
-            "end_date": new_end,
             "market": market,
-            "rate": new_rate,
-            "volume": new_volume,
-            "taxonomy": generate_o_o_taxonomy(market, pub, product, fmt, device),
-            "li_name": generate_li_name(market, pub, product, fmt, device),
-            "flight_days": new_flight_days,
-            "total_cost": new_total_cost,
-            "currency": currency
+            "publisher": publisher
         }
-        st.session_state.flights.append(flight_data)
-        st.success(f"✅ Flight added! Total flights: {len(st.session_state.flights)}")
-        st.rerun()
-
-# Display added flights
-if st.session_state.flights:
-    st.subheader(f"📋 Added Flights ({len(st.session_state.flights)})")
-    for i, flight in enumerate(st.session_state.flights):
-        col1, col2, col3 = st.columns([4, 1, 1])
-        with col1:
-            flight_days = flight.get("flight_days", 1)
-            rate_type = "CPD" if "Takeover" in flight["product"] else "CPM"
-            st.write(f"**Flight {i+1}:** {flight['start_date'].strftime('%Y-%m-%d')} → {flight['end_date'].strftime('%Y-%m-%d')} | {flight_days} days | {rate_type} {flight['currency']}{flight['rate']:.2f} | Total: {flight['currency']}{flight['total_cost']:,.2f}")
-        with col2:
-            st.write("")  # Spacer
-        with col3:
-            if st.button("❌ Remove", key=f"remove_{i}", use_container_width=True):
-                st.session_state.flights.pop(i)
-                st.rerun()
-
-# ================================================================================
-# EXPORT SECTION
-# ================================================================================
-st.subheader("📥 Export Media Plan")
-
-# Use added flights if available, otherwise use current configuration
-if st.session_state.flights:
-    flights_to_export = st.session_state.flights
-    st.info(f"📤 Exporting {len(flights_to_export)} flight(s)")
+        
+        wb = make_excel(flights_data, campaign_info)
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+        
+        filename = f"{advertiser}_{campaign}_{market}_{publisher}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        st.download_button(
+            label="📥 Download Excel",
+            data=excel_buffer,
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    
+    with col2:
+        campaign_info = {
+            "advertiser": advertiser,
+            "campaign": campaign,
+            "market": market,
+            "publisher": publisher
+        }
+        
+        pdf_buffer = make_pdf(flights_data, campaign_info)
+        pdf_filename = f"Monetize_Media_Plan_{advertiser}_{campaign}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        st.download_button(
+            label="📄 Download PDF",
+            data=pdf_buffer,
+            file_name=pdf_filename,
+            mime="application/pdf",
+            use_container_width=True
+        )
+    
+    with col3:
+        json_data = {
+            "campaign_info": {
+                "advertiser": advertiser,
+                "campaign": campaign,
+                "market": market,
+                "publisher": publisher
+            },
+            "flights": flights_data
+        }
+        
+        json_filename = f"{advertiser}_{campaign}_{market}_{publisher}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        st.download_button(
+            label="📥 Download JSON",
+            data=json.dumps(json_data, indent=2, default=str),
+            file_name=json_filename,
+            mime="application/json",
+            use_container_width=True
+        )
 else:
-    # Create a single flight entry from current configuration
-    flights_to_export = [{
-        "advertiser": advertiser,
-        "campaign": campaign,
-        "publisher": pub,
-        "start_date": start_date,
-        "end_date": end_date,
-        "market": market,
-        "product": product,
-        "format": fmt,
-        "device": device,
-        "rate": rate,
-        "volume": volume,
-        "taxonomy": taxonomy,
-        "flight_days": flight_days,
-        "total_cost": total_cost,
-        "currency": currency
-    }]
-
-json_export = {
-    "Advertiser": advertiser,
-    "Campaign": campaign,
-    "Market": market,
-    "Publisher": pub,
-    "FlightsCount": len(flights_to_export),
-    "Flights": [
-        {
-            "Product": flight["product"],
-            "Format": flight["format"],
-            "Device": flight["device"],
-            "Start": flight["start_date"].strftime("%Y-%m-%d"),
-            "End": flight["end_date"].strftime("%Y-%m-%d"),
-            "RateType": "CPD" if "Takeover" in flight["product"] else "CPM",
-            "Rate": float(flight["rate"]),
-            "TotalCost": float(flight.get("total_cost", 0)),
-            "Taxonomy": flight.get("taxonomy", ""),
-            "Seat": "280 - Monetize"
-        }
-        for flight in flights_to_export
-    ]
-}
-
-ex_col1, ex_col2 = st.columns(2)
-
-with ex_col1:
-    excel_wb = create_excel_export(flights_to_export)
-    excel_bytes = BytesIO()
-    excel_wb.save(excel_bytes)
-    excel_bytes.seek(0)
-    st.download_button(
-        label="📊 Download Excel",
-        data=excel_bytes.getvalue(),
-        file_name="Microsoft_Advertising_MediaPlan_generated.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-with ex_col2:
-    json_str = json.dumps(json_export, indent=2)
-    st.download_button(
-        label="📄 Download JSON",
-        data=json_str,
-        file_name="media_plan.json",
-        mime="application/json"
-    )
-
-# ================================================================================
-# FOOTER
-# ================================================================================
-st.divider()
-st.markdown("**Monetize Seat 280 - Guaranteed Delivery Only**", help="No PMP | No Curate | No Open Auction")
-st.markdown("*Last Updated: Feb 26, 2026*")
+    st.warning("⚠️ Fill in Campaign Name and Advertiser to generate exports")
