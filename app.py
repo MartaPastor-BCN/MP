@@ -60,31 +60,6 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
-    /* Minimalist Pressure Card */
-    .pressure-card {
-        border-left: 4px solid #0078D4;
-        background-color: #FFFFFF;
-        padding: 18px;
-        margin-bottom: 16px;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        animation: fadeIn 0.4s ease-in;
-    }
-    
-    .pressure-label {
-        font-size: 1.1rem;
-        color: #5A5A5A;
-        font-weight: 600;
-        margin-bottom: 8px;
-        letter-spacing: 0.3px;
-    }
-    
-    .pressure-explanation {
-        font-size: 0.95rem;
-        color: #666;
-        line-height: 1.5;
-    }
-    
     /* Table Styling - Subtle Shadows */
     .stDataFrame {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
@@ -167,7 +142,7 @@ if "campaign_details" not in st.session_state:
 # PRODUCT RULES - MONETIZE GUARANTEED ONLY (SEAT 280)
 # ================================================================================
 PRODUCT_RULES = {
-    "Programmatic Guaranteed - First Impression": {
+    "PG - First Impression": {
         "seat": "280 - Monetize",
         "priority": 7,
         "frequency_cap": "1 impression per user per day",
@@ -180,7 +155,7 @@ PRODUCT_RULES = {
         "publishers": ["MSN"],
         "formats": ["Banner"]
     },
-    "Programmatic Guaranteed - Standard": {
+    "PG - Standard": {
         "seat": "280 - Monetize",
         "priority": 5,
         "frequency_cap": "6 impressions per user per day",
@@ -245,7 +220,7 @@ PRODUCT_RULES = {
         "publishers": ["Outlook"],
         "formats": ["Native"]
     },
-    "PG - Programmatic Guaranteed (Video)": {
+    "PG - Video": {
         "seat": "280 - Monetize",
         "priority": 10,
         "frequency_cap": "2 impressions per user per day",
@@ -406,7 +381,7 @@ def create_internal_excel_export(flights_list, campaign_info, delivery_pressure_
         ("Frequency Cap", "Per product rules"),
         ("Pacing", "Even / ASAP"),
         ("KV Parameters", "KV pub=msn (MSN) | Direct (Outlook)"),
-        ("Line Item Type", "Programmatic Guaranteed (PG)"),
+        ("Line Item Type", "PG"),
         ("Inventory Type", "Banner / Video / Native"),
         ("Geo Targeting", "Country required"),
     ]
@@ -466,7 +441,7 @@ def create_internal_excel_export(flights_list, campaign_info, delivery_pressure_
     return wb
 
 def create_excel_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym):
-    """Create client-facing Excel file with Microsoft-style formatting and forecasting table."""
+    """Create IO Excel file with Microsoft-style formatting and forecasting table."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Media Plan"
@@ -588,7 +563,6 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
         ("CPM", f"{cpm_rate:,.2f} {currency_sym}"),
         ("Total Impressions", f"{total_impressions:,.0f}"),
         ("Est. Daily Impressions", f"{total_impressions / max(1, sum((f.get('end_date') - f.get('start_date')).days + 1 for f in flights_list) if flights_list and hasattr(flights_list[0].get('start_date'), '__sub__') else 1):,.0f}"),
-        ("Delivery Risk Level", delivery_pressure_label),
     ]
     
     for metric, value in forecast_data:
@@ -608,7 +582,7 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
     return wb
 
 def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym):
-    """Create client-facing PDF file with same information as Excel."""
+    """Create IO PDF file with same information as Excel."""
     pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
     elements = []
@@ -717,7 +691,6 @@ def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, prod
         ["CPM", f"{cpm_rate:,.2f} {currency_sym}"],
         ["Total Impressions", f"{total_impressions:,.0f}"],
         ["Est. Daily Impressions", f"{total_impressions / max(1, flight_days):,.0f}"],
-        ["Delivery Risk Level", delivery_pressure_label],
     ]
     
     forecast_table = Table(forecast_data, colWidths=[2.5*inch, 2.5*inch])
@@ -1000,8 +973,8 @@ export_flights = st.session_state.flights if st.session_state.flights else [
 
 # ================================================================================
 # RISK & QUALITY CONTROL
-st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
 # ================================================================================
+st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
 st.markdown("## Risk & Quality Control")
 
 product_config = PRODUCT_RULES.get(product, {})
@@ -1011,22 +984,6 @@ delivery_pressure, pressure_explanation = calculate_delivery_pressure(
     product,
     freq_cap_text
 )
-
-# Display pressure indicator with minimal design (icon + neutral color)
-pressure_icons = {
-    "Low": "✓",
-    "Medium": "⚠️",
-    "High": "→"
-}
-
-pressure_icon = pressure_icons.get(delivery_pressure, "→")
-
-st.markdown(f"""
-<div class="pressure-card">
-    <div class="pressure-label">{pressure_icon} Delivery Success Pressure: {delivery_pressure}</div>
-    <div class="pressure-explanation">{pressure_explanation}</div>
-</div>
-""", unsafe_allow_html=True)
 
 # Calculate QC metrics
 total_imp = sum(f.get("volume", 0) for f in (st.session_state.flights if st.session_state.flights else export_flights))
@@ -1041,59 +998,41 @@ if isinstance(end_dt, str):
     end_dt = datetime.strptime(end_dt, "%Y-%m-%d").date()
 flight_duration = (end_dt - start_dt).days + 1 if start_dt and end_dt else 0
 
-# Determine KV Parameters based on publisher
-kv_parameters = product_config.get("publisher_targeting", "N/A")
+# Create unified checklist table combining TARGETING SETUP + QC CHECKLIST
+unified_checklist = [
+    ("Priority", product_config.get("priority", "N/A")),
+    ("Frequency Cap", product_config.get("frequency_cap", "N/A")),
+    ("Pacing", product_config.get("pacing", "Even")),
+    ("KV Parameters", "KV pub=msn (MSN)" if publisher == "MSN" else "Direct Inventory (Outlook)" if publisher == "Outlook" else "KV pub=msn (MSN) | Direct (Outlook)"),
+    ("Line Item Type", product_config.get("line_item_type", "N/A")),
+    ("Dates", f"{start_dt.strftime('%m/%d/%Y') if start_dt else 'N/A'} - {end_dt.strftime('%m/%d/%Y') if end_dt else 'N/A'}"),
+    ("Geo Targeting", product_config.get("geo_targeting", "Country required")),
+    ("Delivery Risk Level", delivery_pressure),
+    ("Total Flights", len(st.session_state.flights if st.session_state.flights else export_flights)),
+    ("Flight Duration (days)", flight_duration),
+    ("Est. Daily Impressions", f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
+    ("Total Impressions", f"{total_imp:,.0f}"),
+    ("CPM", f"{cpm_rate:.2f} {currency_sym}"),
+    ("Publisher Targeting", "KV" if publisher == "MSN" else "Direct Inventory"),
+    ("Request Date", datetime.now().strftime("%m/%d/%Y")),
+]
 
-# Create comprehensive QC table
-qc_table_data = {
-    "TARGETING SETUP": [
-        ("Priority", product_config.get("priority", "N/A")),
-        ("Frequency Cap", product_config.get("frequency_cap", "N/A")),
-        ("Pacing", product_config.get("pacing", "Even")),
-        ("KV Parameters", "KV pub=msn (MSN)" if publisher == "MSN" else "Direct Inventory (Outlook)" if publisher == "Outlook" else "KV pub=msn (MSN) | Direct (Outlook)"),
-        ("Line Item Type", product_config.get("line_item_type", "N/A")),
-        ("Dates", f"{start_dt.strftime('%m/%d/%Y') if start_dt else 'N/A'} - {end_dt.strftime('%m/%d/%Y') if end_dt else 'N/A'}"),
-        ("Geo Targeting", product_config.get("geo_targeting", "Country required")),
-    ],
-    "QC CHECKLIST": [
-        ("Delivery Risk Level", delivery_pressure),
-        ("Total Flights", len(st.session_state.flights if st.session_state.flights else export_flights)),
-        ("Flight Duration (days)", flight_duration),
-        ("Est. Daily Impressions", f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
-        ("Total Impressions", f"{total_imp:,.0f}"),
-        ("CPM", f"{cpm_rate:.2f} {currency_sym}"),
-        ("Publisher Targeting", "KV" if publisher == "MSN" else "Direct Inventory"),
-        ("Request Date", datetime.now().strftime("%m/%d/%Y")),
-    ]
-}
+# Display unified table
+table_data = []
+for item_name, item_value in unified_checklist:
+    table_data.append([item_name, str(item_value)])
 
-# Display tables
-for section_title, qc_items in qc_table_data.items():
-    st.markdown(f"""
-    <div style="margin-top: 2rem; margin-bottom: 1.5rem;">
-        <h3 style="color: #0078D4; letter-spacing: 0.3px; font-weight: 600; font-size: 1.1rem; margin-bottom: 1rem;">
-            {section_title}
-        </h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Create a formatted table
-    table_data = []
-    for item_name, item_value in qc_items:
-        table_data.append([item_name, str(item_value)])
-    
-    # Display as dataframe with enhanced styling
-    df = pd.DataFrame(table_data, columns=["Item", "Value"])
-    st.dataframe(
-        df, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "Item": st.column_config.TextColumn(width="medium"),
-            "Value": st.column_config.TextColumn(width="large"),
-        }
-    )
-    st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
+df = pd.DataFrame(table_data, columns=["Item", "Value"])
+st.dataframe(
+    df, 
+    use_container_width=True, 
+    hide_index=True,
+    column_config={
+        "Item": st.column_config.TextColumn(width="medium"),
+        "Value": st.column_config.TextColumn(width="large"),
+    }
+)
+st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
 
 # ================================================================================
 # EXPORT MEDIA PLAN
@@ -1106,7 +1045,7 @@ st.markdown('<div style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
 
 col_export1, col_export2, col_export3 = st.columns(3)
 
-# Client-Facing Excel Export
+# IO Excel Export
 with col_export1:
     excel_file = create_excel_export(
         export_flights, 
@@ -1121,15 +1060,15 @@ with col_export1:
     excel_bytes.seek(0)
     
     st.download_button(
-        label="📊 Client-Facing (Excel)",
+        label="📊 IO (Excel)",
         data=excel_bytes.getvalue(),
-        file_name="MediaPlan_ClientFacing.xlsx",
+        file_name="MediaPlan_IO.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
         help="Microsoft-style Excel file with campaign details and forecasting"
     )
 
-# Client-Facing PDF Export
+# IO PDF Export
 with col_export2:
     pdf_buffer = create_pdf_export(
         export_flights, 
@@ -1141,9 +1080,9 @@ with col_export2:
     )
     
     st.download_button(
-        label="📄 Client-Facing (PDF)",
+        label="📄 IO (PDF)",
         data=pdf_buffer.getvalue(),
-        file_name="MediaPlan_ClientFacing.pdf",
+        file_name="MediaPlan_IO.pdf",
         mime="application/pdf",
         use_container_width=True,
         help="PDF version of the media plan"
