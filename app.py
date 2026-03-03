@@ -232,6 +232,19 @@ PRODUCT_RULES = {
         "revenue_type": "CPM",
         "publishers": ["MSN"],
         "formats": ["Video"]
+    },
+    "GDALI - MSN Video": {
+        "seat": "280 - Monetize",
+        "priority": 10,
+        "frequency_cap": "2 impressions per user per day",
+        "pacing": "Even",
+        "inventory_type": "Video",
+        "geo_targeting": "Country required",
+        "publisher_targeting": "KV pub=msn",
+        "line_item_type": "Guaranteed (GDALI)",
+        "revenue_type": "CPM",
+        "publishers": ["MSN"],
+        "formats": ["Video"]
     }
 }
 
@@ -256,6 +269,18 @@ REGION_CURRENCY = {
     "MX": ("MXN", "$"),
 }
 
+# Suggested CPM reference ranges by product (align with DNV Rate Card)
+CPM_RECOMMENDATIONS = {
+    "PG - First Impression": {"min": 15, "default": 20, "max": 40, "note": "Premium first-in-page position"},
+    "PG - Standard": {"min": 8, "default": 12, "max": 25, "note": "Standard banner, MSN/Outlook"},
+    "PG - Video": {"min": 25, "default": 35, "max": 65, "note": "In-stream / out-stream video on MSN"},
+    "GDALI - MSN Video": {"min": 25, "default": 35, "max": 65, "note": "GDALI video guaranteed on MSN"},
+    "High Impact": {"min": 20, "default": 30, "max": 60, "note": "High-impact unit, premium placement"},
+    "GDALI - Impressions": {"min": 8, "default": 12, "max": 25, "note": "GDALI guaranteed impressions"},
+    "GDALI - MSN Takeover": {"min": 35, "default": 50, "max": 90, "note": "MSN page takeover, sole-brand"},
+    "GDALI - Outlook Takeover": {"min": 30, "default": 40, "max": 75, "note": "Outlook takeover, high engagement"},
+}
+
 # ================================================================================
 # HELPER FUNCTIONS
 # ================================================================================
@@ -274,13 +299,23 @@ def get_compatible_formats(product, publisher):
         return formats
 
 def generate_o_o_taxonomy(market, publisher, product, ad_format, device):
-    """Generate O&O Naming Taxonomy."""
+    """Generate O&O Naming Taxonomy — uses Views suffix for video, Imps for display."""
     device_code = {"All Devices": "AllDevices", "Desktop": "Desktop", "Mobile": "Mobile", "Tablet": "Tablet"}.get(device, "AllDevices")
-    return f"{market}_{publisher}_{product}_{ad_format}_{device_code}_PG_Imps"
+    metric = "Views" if ad_format == "Video" else "Imps"
+    li_code = PRODUCT_RULES.get(product, {}).get("line_item_type", "PG").replace("Guaranteed (", "").replace(")", "")
+    return f"{market}_{publisher}_{product}_{ad_format}_{device_code}_{li_code}_{metric}"
 
 def generate_li_name(advertiser, market, publisher, product):
     """Generate Line Item Name."""
     return f"{advertiser}_{market}_{publisher}_{product}"
+
+def is_video_product(product_name):
+    """Return True if the product uses Video inventory."""
+    return PRODUCT_RULES.get(product_name, {}).get("inventory_type") == "Video"
+
+def get_default_cpm(product_name):
+    """Return the suggested default CPM for a product."""
+    return float(CPM_RECOMMENDATIONS.get(product_name, {"default": 10.0})["default"])
 
 def calculate_delivery_pressure(flights_list, product_name, frequency_cap_text=""):
     """
@@ -440,7 +475,7 @@ def create_internal_excel_export(flights_list, campaign_info, delivery_pressure_
     
     return wb
 
-def create_excel_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym):
+def create_excel_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym, vcr_target=None, completed_views=None):
     """Create IO Excel file with Microsoft-style formatting and forecasting table."""
     wb = Workbook()
     ws = wb.active
@@ -564,6 +599,12 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
         ("Total Impressions", f"{total_impressions:,.0f}"),
         ("Est. Daily Impressions", f"{total_impressions / max(1, sum((f.get('end_date') - f.get('start_date')).days + 1 for f in flights_list) if flights_list and hasattr(flights_list[0].get('start_date'), '__sub__') else 1):,.0f}"),
     ]
+    # Add video metrics if applicable
+    if vcr_target is not None and product_config.get("inventory_type") == "Video":
+        forecast_data.append(("Target VCR (%)", f"{vcr_target}%"))
+        forecast_data.append(("Est. Completed Views", f"{completed_views:,.0f}" if completed_views else "—"))
+        if completed_views and total_budget:
+            forecast_data.append(("Est. Cost / Completed View", f"{currency_sym}{total_budget / completed_views:.4f}"))
     
     for metric, value in forecast_data:
         ws.cell(row=forecast_row, column=1).value = metric
@@ -581,7 +622,7 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
     
     return wb
 
-def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym):
+def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym, vcr_target=None, completed_views=None):
     """Create IO PDF file with same information as Excel."""
     pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
@@ -692,6 +733,12 @@ def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, prod
         ["Total Impressions", f"{total_impressions:,.0f}"],
         ["Est. Daily Impressions", f"{total_impressions / max(1, flight_days):,.0f}"],
     ]
+    # Add video metrics if applicable
+    if vcr_target is not None and product_config.get("inventory_type") == "Video":
+        forecast_data.append(["Target VCR (%)", f"{vcr_target}%"])
+        forecast_data.append(["Est. Completed Views", f"{completed_views:,.0f}" if completed_views else "—"])
+        if completed_views and total_budget:
+            forecast_data.append(["Est. Cost / Completed View", f"{currency_sym}{total_budget / completed_views:.4f}"])
     
     forecast_table = Table(forecast_data, colWidths=[2.5*inch, 2.5*inch])
     forecast_table.setStyle(TableStyle([
@@ -845,12 +892,14 @@ with col_price1:
     )
 
 with col_price2:
+    _cpm_rec = CPM_RECOMMENDATIONS.get(product, {"default": 10.0, "min": 5.0, "max": 50.0, "note": ""})
     cpm_rate = st.number_input(
         f"CPM ({currency_sym})",
         min_value=0.01,
-        value=10.0,
+        value=float(_cpm_rec["default"]),
         step=0.01,
-        key="cpm_rate"
+        key="cpm_rate",
+        help=f"Suggested range: {currency_sym}{_cpm_rec['min']}–{currency_sym}{_cpm_rec['max']} · {_cpm_rec.get('note', '')}"
     )
 
 with col_price3:
@@ -863,7 +912,37 @@ with col_price3:
 
 total_cost = budget
 
-st.caption(f"💡 CPM rate ({currency_sym}{cpm_rate:.2f}) should align with DNV Rate Card for {market}. Confirm before IO submission.")
+# Initialize video defaults (will be overridden below for video products)
+vcr_target = 75
+completed_views = 0
+
+# Smart CPM validation
+_cpm_range = CPM_RECOMMENDATIONS.get(product, {"min": 5.0, "max": 50.0, "note": ""})
+if cpm_rate < _cpm_range.get("min", 0):
+    st.warning(f"⚠️ CPM {currency_sym}{cpm_rate:.2f} is below the suggested minimum for **{product}** ({currency_sym}{_cpm_range['min']:.2f}). Verify with Rate Card.")
+elif cpm_rate > _cpm_range.get("max", 9999):
+    st.info(f"ℹ️ CPM {currency_sym}{cpm_rate:.2f} exceeds the typical range for **{product}**. Confirm pricing is approved.")
+else:
+    st.caption(f"✅ CPM {currency_sym}{cpm_rate:.2f} is within the suggested range ({currency_sym}{_cpm_range['min']}–{currency_sym}{_cpm_range['max']}) · Align with DNV Rate Card · {market}")
+
+# Video-specific metrics (shown only for video products)
+if is_video_product(product):
+    st.markdown("**🎥 Video Metrics**")
+    col_vid1, col_vid2, col_vid3 = st.columns(3)
+    with col_vid1:
+        vcr_target = st.slider(
+            "Target VCR (%)", min_value=50, max_value=100, value=75, step=5,
+            help="Video Completion Rate — % of impressions watched to completion"
+        )
+    with col_vid2:
+        completed_views = impressions * (vcr_target / 100)
+        st.metric("Estimated Completed Views", f"{completed_views:,.0f}")
+    with col_vid3:
+        if completed_views > 0:
+            cost_per_view = budget / completed_views
+            st.metric("Est. Cost / Completed View", f"{currency_sym}{cost_per_view:.4f}")
+        else:
+            st.metric("Est. Cost / Completed View", "—")
 
 # ================================================================================
 # 5. TARGETING RULES (LOCKED BY PRODUCT)
@@ -1017,6 +1096,13 @@ unified_checklist = [
     ("Request Date", datetime.now().strftime("%m/%d/%Y")),
 ]
 
+# Add video-specific rows when applicable
+if is_video_product(product):
+    unified_checklist.append(("Target VCR (%)", f"{vcr_target}%"))
+    unified_checklist.append(("Est. Completed Views", f"{completed_views:,.0f}" if completed_views > 0 else "—"))
+    if completed_views > 0 and budget > 0:
+        unified_checklist.append(("Est. Cost / Completed View", f"{currency_sym}{budget / completed_views:.4f}"))
+
 # Display unified table
 table_data = []
 for item_name, item_value in unified_checklist:
@@ -1053,7 +1139,9 @@ with col_export1:
         delivery_pressure,
         product_config,
         cpm_rate,
-        currency_sym
+        currency_sym,
+        vcr_target=vcr_target if is_video_product(product) else None,
+        completed_views=completed_views if is_video_product(product) else None
     )
     excel_bytes = BytesIO()
     excel_file.save(excel_bytes)
@@ -1076,7 +1164,9 @@ with col_export2:
         delivery_pressure,
         product_config,
         cpm_rate,
-        currency_sym
+        currency_sym,
+        vcr_target=vcr_target if is_video_product(product) else None,
+        completed_views=completed_views if is_video_product(product) else None
     )
     
     st.download_button(
