@@ -140,112 +140,278 @@ if "campaign_details" not in st.session_state:
 
 # ================================================================================
 # PRODUCT RULES - MONETIZE GUARANTEED ONLY (SEAT 280)
+# Full matrix: publisher × format × device — no PMPs
 # ================================================================================
 PRODUCT_RULES = {
+    # ── PG FIRST IMPRESSION ──────────────────────────────────────────────────
     "PG - First Impression": {
         "seat": "280 - Monetize",
-        "priority": 7,
-        "frequency_cap": "1 impression per user per day",
-        "pacing": "ASAP",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub = msn",
         "line_item_type": "PG",
         "revenue_type": "CPM",
+        "delivery_type": "N/A",
+        "allow_rtb": False,
+        "underspend_catchup": "N/A",
+        "impression_pacing": "100%",
+        "creative_rotation": "N/A",
+        "landing_page": "None",
         "publishers": ["MSN"],
-        "formats": ["Banner"]
+        "formats": ["Banner"],
+        "priority": 7,
+        "frequency_cap": "1 imp/day",
+        "pacing": "ASAP",
+        "inventory_type": "Banner",
+        "geo_targeting": "Country Targeting",
+        "publisher_targeting": "KV pub = msn",
+        "supply_targeting": "App & Web",
+        "device_config": {
+            "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet",
+                            "ad_sizes": "300x250, 300x600, 728x90, 970x250, 320x50",
+                            "inventory_targeting": "KV pub = msn", "min_creatives": 1},
+            "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",
+                            "ad_sizes": "728x90, 970x250, 300x250, 300x600",
+                            "inventory_targeting": "KV pub = msn", "min_creatives": 1},
+            "Mobile":      {"supply": "Web Only",  "device_targeting": "Mobile, Tablet",
+                            "ad_sizes": "320x50",
+                            "inventory_targeting": "KV pub = msn", "min_creatives": 1},
+        },
     },
+    # ── PG STANDARD ──────────────────────────────────────────────────────────
     "PG - Standard": {
         "seat": "280 - Monetize",
+        "line_item_type": "PG",
+        "revenue_type": "CPM",
+        "delivery_type": "N/A",
+        "allow_rtb": False,
+        "underspend_catchup": "N/A",
+        "impression_pacing": "100%",
+        "creative_rotation": "N/A",
+        "landing_page": "None",
+        "publishers": ["MSN", "Outlook", "ABK", "MCG"],
+        "formats": ["Banner", "Native", "Video"],
         "priority": 5,
-        "frequency_cap": "6 impressions per user per day",
+        "frequency_cap": "6 imps/day",
         "pacing": "Even",
         "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn (MSN) | Direct Inventory - Outlook Native (Outlook)",
-        "line_item_type": "PG",
-        "revenue_type": "CPM",
-        "publishers": ["MSN", "Outlook"],
-        "formats": ["Banner", "Native"]
+        "geo_targeting": "Country Targeting",
+        "publisher_targeting": "KV pub = msn / outlook / microsoftcasualgames / abk",
+        "supply_targeting": "App & Web",
+        "publisher_format_config": {
+            ("MSN", "Banner"): {
+                "inventory_targeting": "KV pub = msn",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 970x250, 320x50"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "728x90, 970x250, 300x250, 300x600"},
+                    "Mobile":      {"supply": "Web Only",  "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
+                },
+            },
+            ("MSN", "Video"): {
+                "inventory_targeting": "KV pub = msn",
+                "creative_specs": "15 seconds OR 30 seconds",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "N/A"},
+                    "Mobile":      {"supply": "Web Only",  "device_targeting": "Mobile, Tablet",           "ad_sizes": "N/A"},
+                },
+            },
+            ("Outlook", "Banner"): {
+                "inventory_targeting": "KV pub = outlook",
+                "device_config": {
+                    "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "160x600, 728x90, 300x250, 300x600"},
+                },
+            },
+            ("Outlook", "Native"): {
+                "inventory_targeting": "Publisher = Outlook Native (1000230)",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A", "min_creatives": 2},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "N/A", "min_creatives": 2},
+                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "N/A", "min_creatives": 1},
+                },
+            },
+            ("MCG", "Banner"): {
+                "inventory_targeting": "KV pub = microsoftcasualgames",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 320x50"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "300x250, 300x600, 728x90"},
+                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
+                },
+            },
+            ("MCG", "Video"): {
+                "inventory_targeting": "KV pub = microsoftcasualgames",
+                "device_config": {
+                    "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "N/A"},
+                },
+            },
+            ("ABK", "Banner"): {
+                "inventory_targeting": "KV pub = abk",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 320x50"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "300x250, 300x600, 728x90"},
+                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
+                },
+            },
+            ("ABK", "Video"): {
+                "inventory_targeting": "KV pub = abk",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A"},
+                },
+            },
+        },
     },
-    "High Impact": {
-        "seat": "280 - Monetize",
-        "priority": 15,
-        "frequency_cap": "2 impressions per user per day",
-        "pacing": "Even",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn",
-        "line_item_type": "PG",
-        "revenue_type": "CPM",
-        "publishers": ["MSN"],
-        "formats": ["Banner"]
-    },
+    # ── GDALI IMPRESSIONS ────────────────────────────────────────────────────
     "GDALI - Impressions": {
         "seat": "280 - Monetize",
-        "priority": 5,
-        "frequency_cap": "6 impressions per user per day",
-        "pacing": "Even",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn (MSN) | Direct Inventory - Outlook Native (Outlook)",
         "line_item_type": "Guaranteed (GDALI)",
         "revenue_type": "CPM",
+        "delivery_type": "Impressions",
+        "allow_rtb": True,
+        "underspend_catchup": "Evenly",
+        "impression_pacing": "100%",
+        "creative_rotation": "Evenly",
+        "landing_page": "None",
         "publishers": ["MSN", "Outlook"],
-        "formats": ["Banner", "Native"]
+        "formats": ["Banner", "Native", "Video"],
+        "priority": 5,
+        "frequency_cap": "6 imps/day",
+        "pacing": "Even",
+        "inventory_type": "Banner",
+        "geo_targeting": "Country Targeting",
+        "publisher_targeting": "KV pub = msn (MSN) | KV pub = outlook (Outlook)",
+        "supply_targeting": "App & Web",
+        "publisher_format_config": {
+            ("MSN", "Banner"): {
+                "inventory_targeting": "KV pub = msn",
+                "creative_specs": "300x250 OR 300x600 OR 728x90 OR 970x250 OR 320x50",
+                "min_creatives": 1,
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 970x250, 320x50"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "728x90, 970x250, 300x250, 300x600"},
+                    "Mobile":      {"supply": "Web Only",  "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
+                },
+            },
+            ("MSN", "Video"): {
+                "inventory_targeting": "KV pub = msn",
+                "creative_specs": "15 seconds OR 30 seconds",
+                "min_creatives": 1,
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "N/A"},
+                    "Mobile":      {"supply": "Web Only",  "device_targeting": "Mobile, Tablet",           "ad_sizes": "N/A"},
+                },
+            },
+            ("Outlook", "Banner"): {
+                "inventory_targeting": "KV pub = outlook",
+                "creative_specs": "160x600, 728x90, 300x250 OR 300x600",
+                "min_creatives": 3,
+                "device_config": {
+                    "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "728x90, 300x250, 300x600"},
+                },
+            },
+            ("Outlook", "Native"): {
+                "inventory_targeting": "Publisher = Outlook Native (1000230)",
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A", "min_creatives": 2},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "N/A", "min_creatives": 2},
+                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "N/A", "min_creatives": 1},
+                },
+            },
+        },
     },
+    # ── GDALI MSN TAKEOVER ───────────────────────────────────────────────────
     "GDALI - MSN Takeover": {
         "seat": "280 - Monetize",
-        "priority": 15,
-        "frequency_cap": "1 impression per user per day",
-        "pacing": "ASAP",
-        "inventory_type": "Banner",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn",
         "line_item_type": "Guaranteed (GDALI)",
-        "revenue_type": "CPM",
+        "revenue_type": "Fixed Fee (Cost Per Day)",
+        "delivery_type": "Exclusive",
+        "allow_rtb": True,
+        "underspend_catchup": "Evenly",
+        "impression_pacing": "100%",
+        "creative_rotation": "Evenly",
+        "landing_page": "None",
         "publishers": ["MSN"],
-        "formats": ["Banner"]
+        "formats": ["Banner"],
+        "priority": 15,
+        "frequency_cap": "Off",
+        "pacing": "Even",
+        "inventory_type": "Banner",
+        "geo_targeting": "Placement Targeting",
+        "publisher_targeting": "Placement Targeting",
+        "supply_targeting": "Web Only",
+        "device_config": {
+            "Desktop": {
+                "supply": "Web Only", "device_targeting": "Desktop, Tablet",
+                "ad_sizes": "728x90, 970x250, 300x250",
+                "creative_specs": "728x90 OR 970x250 | 300x250 | 728x90",
+                "min_creatives": 1, "inventory_targeting": "Placement Targeting",
+            },
+        },
     },
+    # ── GDALI OUTLOOK TAKEOVER ───────────────────────────────────────────────
     "GDALI - Outlook Takeover": {
         "seat": "280 - Monetize",
-        "priority": 15,
-        "frequency_cap": "1 impression per user per day",
-        "pacing": "ASAP",
-        "inventory_type": "Native",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "Direct Inventory - Outlook Native",
         "line_item_type": "Guaranteed (GDALI)",
-        "revenue_type": "CPM",
+        "revenue_type": "Fixed Fee (Cost Per Day)",
+        "delivery_type": "Exclusive",
+        "allow_rtb": True,
+        "underspend_catchup": "Evenly",
+        "impression_pacing": "100%",
+        "creative_rotation": "Evenly",
+        "landing_page": "None",
         "publishers": ["Outlook"],
-        "formats": ["Native"]
-    },
-    "PG - Video": {
-        "seat": "280 - Monetize",
-        "priority": 10,
-        "frequency_cap": "2 impressions per user per day",
+        "formats": ["Banner", "Native"],
+        "priority": 15,
+        "frequency_cap": "Off",
         "pacing": "Even",
-        "inventory_type": "Video",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn",
+        "inventory_type": "Native",
+        "geo_targeting": "Country Targeting",
+        "publisher_targeting": "Publisher Targeting",
+        "supply_targeting": "Web Only",
+        "publisher_format_config": {
+            ("Outlook", "Banner"): {
+                "inventory_targeting": "Publisher Targeting (Country Specific)",
+                "creative_specs": "160x600, 728x90, 300x250 OR 300x600",
+                "min_creatives": 3,
+                "device_config": {
+                    "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "160x600, 728x90, 300x250, 300x600"},
+                },
+            },
+            ("Outlook", "Native"): {
+                "inventory_targeting": "Publisher = Outlook Native (1000230)",
+                "min_creatives": 2,
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A"},
+                },
+            },
+        },
+    },
+    # ── HIGH IMPACT PG ───────────────────────────────────────────────────────
+    "High Impact": {
+        "seat": "280 - Monetize",
         "line_item_type": "PG",
         "revenue_type": "CPM",
+        "delivery_type": "N/A",
+        "allow_rtb": False,
+        "underspend_catchup": "N/A",
+        "impression_pacing": "100%",
+        "creative_rotation": "N/A",
+        "landing_page": "None",
         "publishers": ["MSN"],
-        "formats": ["Video"]
-    },
-    "GDALI - MSN Video": {
-        "seat": "280 - Monetize",
-        "priority": 10,
-        "frequency_cap": "2 impressions per user per day",
+        "formats": ["Banner"],
+        "priority": 15,
+        "frequency_cap": "Off",
         "pacing": "Even",
-        "inventory_type": "Video",
-        "geo_targeting": "Country required",
-        "publisher_targeting": "KV pub=msn",
-        "line_item_type": "Guaranteed (GDALI)",
-        "revenue_type": "CPM",
-        "publishers": ["MSN"],
-        "formats": ["Video"]
-    }
+        "inventory_type": "Banner",
+        "geo_targeting": "Placement Targeting",
+        "publisher_targeting": "Placement Targeting",
+        "supply_targeting": "App & Web",
+        "device_config": {
+            "Desktop": {
+                "supply": "App & Web", "device_targeting": "Desktop, Tablet",
+                "ad_sizes": "ATF: 970x250, 728x90, 300x250 | BTF: 300x250, 300x600",
+                "creative_specs": "ATF: 970x250 OR 728x90 OR 300x250 | BTF: 300x250 OR 300x600",
+                "min_creatives": 1, "inventory_targeting": "Placement Targeting",
+            },
+        },
+    },
 }
 
 REGION_CURRENCY = {
@@ -269,16 +435,16 @@ REGION_CURRENCY = {
     "MX": ("MXN", "$"),
 }
 
-# Suggested CPM reference ranges by product (align with DNV Rate Card)
+# CPM reference ranges by product + format (align with DNV Rate Card)
 CPM_RECOMMENDATIONS = {
-    "PG - First Impression": {"min": 15, "default": 20, "max": 40, "note": "Premium first-in-page position"},
-    "PG - Standard": {"min": 8, "default": 12, "max": 25, "note": "Standard banner, MSN/Outlook"},
-    "PG - Video": {"min": 25, "default": 35, "max": 65, "note": "In-stream / out-stream video on MSN"},
-    "GDALI - MSN Video": {"min": 25, "default": 35, "max": 65, "note": "GDALI video guaranteed on MSN"},
-    "High Impact": {"min": 20, "default": 30, "max": 60, "note": "High-impact unit, premium placement"},
-    "GDALI - Impressions": {"min": 8, "default": 12, "max": 25, "note": "GDALI guaranteed impressions"},
-    "GDALI - MSN Takeover": {"min": 35, "default": 50, "max": 90, "note": "MSN page takeover, sole-brand"},
-    "GDALI - Outlook Takeover": {"min": 30, "default": 40, "max": 75, "note": "Outlook takeover, high engagement"},
+    "PG - First Impression":        {"min": 15,   "default": 20,    "max": 40,    "note": "Premium first-in-page · MSN Banner"},
+    "PG - Standard":                {"min": 8,    "default": 12,    "max": 25,    "note": "Banner/Native · MSN, Outlook, ABK, MCG"},
+    "PG - Standard (Video)":        {"min": 25,   "default": 35,    "max": 65,    "note": "Video · MSN, ABK, MCG"},
+    "GDALI - Impressions":          {"min": 8,    "default": 12,    "max": 25,    "note": "GDALI Guaranteed · Banner/Native"},
+    "GDALI - Impressions (Video)":  {"min": 25,   "default": 35,    "max": 65,    "note": "GDALI Guaranteed · Video · MSN"},
+    "GDALI - MSN Takeover":         {"min": 5000, "default": 15000, "max": 50000, "note": "Fixed Fee per day (not a CPM product)"},
+    "GDALI - Outlook Takeover":     {"min": 3000, "default": 10000, "max": 30000, "note": "Fixed Fee per day (not a CPM product)"},
+    "High Impact":                  {"min": 20,   "default": 30,    "max": 60,    "note": "High-impact placement · MSN Banner"},
 }
 
 # ================================================================================
@@ -289,14 +455,42 @@ def get_currency_symbol(market):
     return REGION_CURRENCY.get(market.upper(), ("USD", "$"))[1]
 
 def get_compatible_formats(product, publisher):
-    """Get compatible formats based on product and publisher."""
+    """Get compatible ad formats for a product + publisher combination, from the matrix."""
     product_info = PRODUCT_RULES.get(product, {})
-    formats = product_info.get("formats", [])
-    
-    if publisher == "Outlook":
-        return [f for f in formats if f == "Native"] or ["Native"]
+    all_formats = product_info.get("formats", ["Banner"])
+
+    # If product has publisher_format_config, derive available formats for this publisher
+    pfc = product_info.get("publisher_format_config", {})
+    if pfc:
+        pub_formats = [fmt for (pub, fmt) in pfc.keys() if pub == publisher]
+        if pub_formats:
+            return sorted(set(pub_formats), key=["Banner", "Native", "Video"].index
+                          if all(f in ["Banner", "Native", "Video"] for f in pub_formats) else str)
+    return all_formats
+
+
+def get_product_config(product, publisher, ad_format, device="All Devices"):
+    """Return a flat targeting dict for the given product / publisher / format / device."""
+    base = dict(PRODUCT_RULES.get(product, {}))
+
+    pfc = base.get("publisher_format_config", {})
+    key = (publisher, ad_format)
+
+    if key in pfc:
+        fmt_cfg = dict(pfc[key])
+        dev_cfg = fmt_cfg.pop("device_config", {})
+        fallback = dev_cfg.get("All Devices", next(iter(dev_cfg.values()), {}) if dev_cfg else {})
+        dev_specific = dict(dev_cfg.get(device, fallback))
+        result = {**base, **fmt_cfg, **dev_specific}
     else:
-        return formats
+        dev_cfg = base.get("device_config", {})
+        fallback = dev_cfg.get("All Devices", next(iter(dev_cfg.values()), {}) if dev_cfg else {})
+        dev_specific = dict(dev_cfg.get(device, fallback))
+        result = {**base, **dev_specific}
+
+    for k in ("publisher_format_config", "device_config"):
+        result.pop(k, None)
+    return result
 
 def generate_o_o_taxonomy(market, publisher, product, ad_format, device):
     """Generate O&O Naming Taxonomy — uses Views suffix for video, Imps for display."""
@@ -309,12 +503,18 @@ def generate_li_name(advertiser, market, publisher, product):
     """Generate Line Item Name."""
     return f"{advertiser}_{market}_{publisher}_{product}"
 
-def is_video_product(product_name):
-    """Return True if the product uses Video inventory."""
+def is_video_product(product_name, ad_format=None):
+    """Return True if the current format is Video."""
+    if ad_format is not None:
+        return ad_format == "Video"
     return PRODUCT_RULES.get(product_name, {}).get("inventory_type") == "Video"
 
-def get_default_cpm(product_name):
-    """Return the suggested default CPM for a product."""
+def get_default_cpm(product_name, ad_format=None):
+    """Return the suggested default CPM for a product, adjusted for video."""
+    if ad_format == "Video":
+        video_key = f"{product_name} (Video)"
+        if video_key in CPM_RECOMMENDATIONS:
+            return float(CPM_RECOMMENDATIONS[video_key]["default"])
     return float(CPM_RECOMMENDATIONS.get(product_name, {"default": 10.0})["default"])
 
 def calculate_delivery_pressure(flights_list, product_name, frequency_cap_text=""):
@@ -536,9 +736,9 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
     row = 7
     ws[f"A{row}"] = "CAMPAIGN OVERVIEW"
     ws[f"A{row}"].font = Font(bold=True, size=11, color="0078D4")
-    
+
     row = 8
-    overview_headers = ["Flight", "Product", "Start Date", "End Date", "Budget", "Total Budget"]
+    overview_headers = ["#", "Product", "Publisher", "Format", "Start Date", "End Date", "Budget"]
     for col, header in enumerate(overview_headers, 1):
         cell = ws.cell(row=row, column=col)
         cell.value = header
@@ -546,79 +746,90 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
         cell.font = subheader_font
         cell.border = border
         cell.alignment = Alignment(horizontal="center", vertical="center")
-    
+
     total_budget = 0
     for row_idx, flight in enumerate(flights_list, 9):
         flight_budget = flight.get('budget', 0)
         total_budget += flight_budget
-        
+
         ws.cell(row=row_idx, column=1).value = flight.get("flight_num", 1)
         ws.cell(row=row_idx, column=2).value = flight.get("product", "")
-        
+        ws.cell(row=row_idx, column=3).value = flight.get("publisher", "")
+        ws.cell(row=row_idx, column=4).value = flight.get("format", "")
+
         start_date = flight.get("start_date")
-        if hasattr(start_date, "strftime"):
-            start_str = start_date.strftime("%m/%d/%Y")
-        else:
-            start_str = str(start_date)
-        ws.cell(row=row_idx, column=3).value = start_str
-        
+        ws.cell(row=row_idx, column=5).value = start_date.strftime("%m/%d/%Y") if hasattr(start_date, "strftime") else str(start_date)
         end_date = flight.get("end_date")
-        if hasattr(end_date, "strftime"):
-            end_str = end_date.strftime("%m/%d/%Y")
-        else:
-            end_str = str(end_date)
-        ws.cell(row=row_idx, column=4).value = end_str
-        
-        ws.cell(row=row_idx, column=5).value = f"{flight_budget:,.2f}"
-        
-        # Total budget in last row
-        if row_idx == len(flights_list) + 8:
-            ws.cell(row=row_idx, column=6).value = f"{total_budget:,.2f}"
+        ws.cell(row=row_idx, column=6).value = end_date.strftime("%m/%d/%Y") if hasattr(end_date, "strftime") else str(end_date)
+        ws.cell(row=row_idx, column=7).value = f"{flight_budget:,.2f}"
     
-    # Forecasting Table
+    # Per-product Forecasting Table
     forecast_row = len(flights_list) + 11
-    ws[f"A{forecast_row}"] = "FORECASTING"
+    ws[f"A{forecast_row}"] = "FORECASTING BY PRODUCT"
     ws[f"A{forecast_row}"].font = Font(bold=True, size=11, color="0078D4")
-    
+
     forecast_row += 1
-    forecast_headers = ["Metric", "Value"]
-    for col, header in enumerate(forecast_headers, 1):
+    f_headers = ["Product", "Publisher", "Format", "CPM", "Budget", "Total Imps", "Est. Daily Avg"]
+    for col, header in enumerate(f_headers, 1):
         cell = ws.cell(row=forecast_row, column=col)
         cell.value = header
         cell.fill = subheader_fill
         cell.font = subheader_font
         cell.border = border
         cell.alignment = Alignment(horizontal="center", vertical="center")
-    
+
     forecast_row += 1
-    total_impressions = sum(f.get("volume", 0) for f in flights_list)
-    
-    forecast_data = [
-        ("Total Budget", f"{total_budget:,.2f} {currency_sym}"),
-        ("CPM", f"{cpm_rate:,.2f} {currency_sym}"),
-        ("Total Impressions", f"{total_impressions:,.0f}"),
-        ("Est. Daily Impressions", f"{total_impressions / max(1, sum((f.get('end_date') - f.get('start_date')).days + 1 for f in flights_list) if flights_list and hasattr(flights_list[0].get('start_date'), '__sub__') else 1):,.0f}"),
-    ]
-    # Add video metrics if applicable
-    if vcr_target is not None and product_config.get("inventory_type") == "Video":
-        forecast_data.append(("Target VCR (%)", f"{vcr_target}%"))
-        forecast_data.append(("Est. Completed Views", f"{completed_views:,.0f}" if completed_views else "—"))
-        if completed_views and total_budget:
-            forecast_data.append(("Est. Cost / Completed View", f"{currency_sym}{total_budget / completed_views:.4f}"))
-    
-    for metric, value in forecast_data:
-        ws.cell(row=forecast_row, column=1).value = metric
+    # Group flights by product/publisher/format
+    fgroups = {}
+    for fl in flights_list:
+        fkey = (fl.get("product", ""), fl.get("publisher", ""), fl.get("format", ""))
+        if fkey not in fgroups:
+            fgroups[fkey] = {"budget": 0, "imps": 0, "cpm": fl.get("cpm", cpm_rate), "days": 0}
+        fgroups[fkey]["budget"] += fl.get("budget", 0)
+        fgroups[fkey]["imps"] += fl.get("volume", 0)
+        sd, ed = fl.get("start_date"), fl.get("end_date")
+        if hasattr(sd, "__sub__") and hasattr(ed, "__sub__"):
+            fgroups[fkey]["days"] += (ed - sd).days + 1
+
+    grand_budget = grand_imps = 0
+    for (fprod, fpub, ffmt), fd in fgroups.items():
+        daily = fd["imps"] / max(1, fd["days"])
+        row_data = [fprod, fpub, ffmt, f"{fd['cpm']:,.2f} {currency_sym}",
+                    f"{fd['budget']:,.2f} {currency_sym}", f"{fd['imps']:,.0f}", f"{daily:,.0f}"]
+        for col, val in enumerate(row_data, 1):
+            ws.cell(row=forecast_row, column=col).value = val
+        grand_budget += fd["budget"]
+        grand_imps += fd["imps"]
+        forecast_row += 1
+
+    if len(fgroups) > 1:
+        # TOTAL row
+        total_row = ["TOTAL", "", "", "—", f"{grand_budget:,.2f} {currency_sym}", f"{grand_imps:,.0f}", "—"]
+        for col, val in enumerate(total_row, 1):
+            c = ws.cell(row=forecast_row, column=col)
+            c.value = val
+            c.font = Font(bold=True)
+        forecast_row += 1
+
+    # Video metrics
+    if vcr_target is not None:
+        ws.cell(row=forecast_row, column=1).value = "Target VCR (%)"
         ws.cell(row=forecast_row, column=1).font = Font(bold=True)
-        ws.cell(row=forecast_row, column=2).value = value
+        ws.cell(row=forecast_row, column=2).value = f"{vcr_target}%"
+        forecast_row += 1
+        ws.cell(row=forecast_row, column=1).value = "Est. Completed Views"
+        ws.cell(row=forecast_row, column=1).font = Font(bold=True)
+        ws.cell(row=forecast_row, column=2).value = f"{completed_views:,.0f}" if completed_views else "—"
         forecast_row += 1
     
     # Set column widths
-    ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 20
-    ws.column_dimensions['C'].width = 15
-    ws.column_dimensions['D'].width = 15
-    ws.column_dimensions['E'].width = 15
-    ws.column_dimensions['F'].width = 15
+    ws.column_dimensions['A'].width = 22
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 14
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 16
     
     return wb
 
@@ -675,81 +886,92 @@ def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, prod
     
     # Campaign Overview
     elements.append(Paragraph("CAMPAIGN OVERVIEW", heading_style))
-    
-    overview_data = [["Flight", "Product", "Start Date", "End Date", "Budget"]]
+
+    overview_data = [["#", "Product", "Publisher", "Format", "Start Date", "End Date", "Budget"]]
     total_budget = 0
-    
+
     for flight in flights_list:
         flight_budget = flight.get('budget', 0)
         total_budget += flight_budget
-        
         start_date = flight.get("start_date")
-        if hasattr(start_date, "strftime"):
-            start_str = start_date.strftime("%m/%d/%Y")
-        else:
-            start_str = str(start_date)
-        
+        start_str = start_date.strftime("%m/%d/%Y") if hasattr(start_date, "strftime") else str(start_date)
         end_date = flight.get("end_date")
-        if hasattr(end_date, "strftime"):
-            end_str = end_date.strftime("%m/%d/%Y")
-        else:
-            end_str = str(end_date)
-        
+        end_str = end_date.strftime("%m/%d/%Y") if hasattr(end_date, "strftime") else str(end_date)
         overview_data.append([
             str(flight.get("flight_num", 1)),
             flight.get("product", ""),
-            start_str,
-            end_str,
+            flight.get("publisher", ""),
+            flight.get("format", ""),
+            start_str, end_str,
             f"{flight_budget:,.2f}"
         ])
-    
-    overview_data.append(["", "", "", "TOTAL:", f"{total_budget:,.2f} {currency_sym}"])
-    
-    overview_table = Table(overview_data, colWidths=[0.8*inch, 1.5*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+
+    overview_data.append(["", "", "", "", "", "TOTAL:", f"{total_budget:,.2f} {currency_sym}"])
+
+    overview_table = Table(overview_data, colWidths=[0.4*inch, 1.2*inch, 0.8*inch, 0.7*inch, 1.1*inch, 1.1*inch, 1.0*inch])
     overview_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0078D4')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#D9E1F2')),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
-    
+
     elements.append(overview_table)
     elements.append(Spacer(1, 0.3*inch))
+
+    # Per-product Forecasting
+    elements.append(Paragraph("FORECASTING BY PRODUCT", heading_style))
+
+    fgroups = {}
+    for fl in flights_list:
+        fkey = (fl.get("product", ""), fl.get("publisher", ""), fl.get("format", ""))
+        if fkey not in fgroups:
+            fgroups[fkey] = {"budget": 0, "imps": 0, "cpm": fl.get("cpm", cpm_rate), "days": 0}
+        fgroups[fkey]["budget"] += fl.get("budget", 0)
+        fgroups[fkey]["imps"] += fl.get("volume", 0)
+        sd, ed = fl.get("start_date"), fl.get("end_date")
+        if hasattr(sd, "__sub__") and hasattr(ed, "__sub__"):
+            fgroups[fkey]["days"] += (ed - sd).days + 1
+
+    forecast_data = [["Product", "Publisher", "Format", "CPM", "Budget", "Total Imps", "Daily Avg"]]
+    grand_budget = grand_imps = 0
+    for (fprod, fpub, ffmt), fd in fgroups.items():
+        daily = fd["imps"] / max(1, fd["days"])
+        forecast_data.append([fprod, fpub, ffmt,
+                               f"{fd['cpm']:,.2f} {currency_sym}",
+                               f"{fd['budget']:,.2f} {currency_sym}",
+                               f"{fd['imps']:,.0f}",
+                               f"{daily:,.0f}"])
+        grand_budget += fd["budget"]
+        grand_imps += fd["imps"]
+
+    if len(fgroups) > 1:
+        forecast_data.append(["TOTAL", "", "", "—",
+                               f"{grand_budget:,.2f} {currency_sym}",
+                               f"{grand_imps:,.0f}", "—"])
+
+    if vcr_target is not None:
+        forecast_data.append(["Target VCR (%)", f"{vcr_target}%", "", "", "", "", ""])
+        forecast_data.append(["Est. Completed Views", f"{completed_views:,.0f}" if completed_views else "—", "", "", "", "", ""])
     
-    # Forecasting
-    elements.append(Paragraph("FORECASTING", heading_style))
-    
-    total_impressions = sum(f.get("volume", 0) for f in flights_list)
-    flight_days = sum((f.get('end_date') - f.get('start_date')).days + 1 for f in flights_list if hasattr(f.get('start_date'), '__sub__')) if flights_list else 1
-    
-    forecast_data = [
-        ["Total Budget", f"{total_budget:,.2f} {currency_sym}"],
-        ["CPM", f"{cpm_rate:,.2f} {currency_sym}"],
-        ["Total Impressions", f"{total_impressions:,.0f}"],
-        ["Est. Daily Impressions", f"{total_impressions / max(1, flight_days):,.0f}"],
-    ]
-    # Add video metrics if applicable
-    if vcr_target is not None and product_config.get("inventory_type") == "Video":
-        forecast_data.append(["Target VCR (%)", f"{vcr_target}%"])
-        forecast_data.append(["Est. Completed Views", f"{completed_views:,.0f}" if completed_views else "—"])
-        if completed_views and total_budget:
-            forecast_data.append(["Est. Cost / Completed View", f"{currency_sym}{total_budget / completed_views:.4f}"])
-    
-    forecast_table = Table(forecast_data, colWidths=[2.5*inch, 2.5*inch])
+    forecast_table = Table(forecast_data, colWidths=[1.3*inch, 0.9*inch, 0.7*inch, 0.9*inch, 1.1*inch, 0.9*inch, 0.9*inch])
     forecast_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#D9E1F2')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0078D4')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#D9E1F2')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
-    
+
     elements.append(forecast_table)
     
     doc.build(elements)
@@ -794,9 +1016,9 @@ with col3:
 with col4:
     publisher = st.selectbox(
         "Publisher",
-        ["MSN", "Outlook"],
+        ["MSN", "Outlook", "ABK", "MCG"],
         key="publisher",
-        help="Target publisher"
+        help="Target publisher (MSN, Outlook, ABK = Activision Blizzard King, MCG = Microsoft Casual Games)"
     )
     st.session_state.campaign_details["publisher"] = publisher
 
@@ -892,14 +1114,15 @@ with col_price1:
     )
 
 with col_price2:
-    _cpm_rec = CPM_RECOMMENDATIONS.get(product, {"default": 10.0, "min": 5.0, "max": 50.0, "note": ""})
+    _cpm_key = f"{product} (Video)" if ad_format == "Video" and f"{product} (Video)" in CPM_RECOMMENDATIONS else product
+    _cpm_rec = CPM_RECOMMENDATIONS.get(_cpm_key, {"default": get_default_cpm(product, ad_format), "min": 5.0, "max": 200.0, "note": ""})
     cpm_rate = st.number_input(
         f"CPM ({currency_sym})",
         min_value=0.01,
         value=float(_cpm_rec["default"]),
         step=0.01,
         key="cpm_rate",
-        help=f"Suggested range: {currency_sym}{_cpm_rec['min']}–{currency_sym}{_cpm_rec['max']} · {_cpm_rec.get('note', '')}"
+        help=f"{_cpm_rec.get('note', '')} · Align with DNV Rate Card"
     )
 
 with col_price3:
@@ -912,21 +1135,19 @@ with col_price3:
 
 total_cost = budget
 
-# Initialize video defaults (will be overridden below for video products)
+# Initialize video defaults
 vcr_target = 75
 completed_views = 0
 
-# Smart CPM validation
-_cpm_range = CPM_RECOMMENDATIONS.get(product, {"min": 5.0, "max": 50.0, "note": ""})
-if cpm_rate < _cpm_range.get("min", 0):
-    st.warning(f"⚠️ CPM {currency_sym}{cpm_rate:.2f} is below the suggested minimum for **{product}** ({currency_sym}{_cpm_range['min']:.2f}). Verify with Rate Card.")
-elif cpm_rate > _cpm_range.get("max", 9999):
-    st.info(f"ℹ️ CPM {currency_sym}{cpm_rate:.2f} exceeds the typical range for **{product}**. Confirm pricing is approved.")
+# CPM alignment note (no pass/fail — user must verify against Rate Card)
+_takeover = "Takeover" in product
+if _takeover:
+    st.info(f"ℹ️ **{product}** uses a Fixed Fee (Cost Per Day), not CPM. Confirm the daily rate with the Rate Card for {market}.")
 else:
-    st.caption(f"✅ CPM {currency_sym}{cpm_rate:.2f} is within the suggested range ({currency_sym}{_cpm_range['min']}–{currency_sym}{_cpm_range['max']}) · Align with DNV Rate Card · {market}")
+    st.caption(f"💡 Align CPM {currency_sym}{cpm_rate:.2f} with the DNV Rate Card for **{market}** · {_cpm_rec.get('note', '')}")
 
-# Video-specific metrics (shown only for video products)
-if is_video_product(product):
+# Video-specific metrics (shown only when Video format is selected)
+if is_video_product(product, ad_format):
     st.markdown("**🎥 Video Metrics**")
     col_vid1, col_vid2, col_vid3 = st.columns(3)
     with col_vid1:
@@ -950,9 +1171,9 @@ if is_video_product(product):
 st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
 st.markdown("## Targeting Rules")
 
-product_config = PRODUCT_RULES.get(product, {})
+product_config = get_product_config(product, publisher, ad_format, device)
 
-st.markdown("**Product Configuration** _(Locked by product)_")
+st.markdown("**Product Configuration** _(Locked by product × publisher × format × device)_")
 
 col_rule1, col_rule2, col_rule3, col_rule4 = st.columns(4)
 
@@ -969,11 +1190,17 @@ with col_rule4:
     st.metric("Revenue Type", product_config.get("revenue_type", "CPM"))
 
 rules_data = {
-    "Frequency Cap": product_config.get("frequency_cap", "N/A"),
-    "Inventory Type": product_config.get("inventory_type", "N/A"),
-    "Geo Targeting": product_config.get("geo_targeting", "N/A"),
-    "Publisher Targeting": product_config.get("publisher_targeting", "N/A"),
-    "Line Item Type": product_config.get("line_item_type", "N/A"),
+    "Frequency Cap":      product_config.get("frequency_cap", "N/A"),
+    "Inventory Targeting": product_config.get("inventory_targeting",
+                           product_config.get("publisher_targeting", "N/A")),
+    "Supply":             product_config.get("supply", product_config.get("supply_targeting", "N/A")),
+    "Ad Sizes":           product_config.get("ad_sizes", "N/A"),
+    "Device Targeting":   product_config.get("device_targeting", "N/A"),
+    "Geo Targeting":      product_config.get("geo_targeting", "N/A"),
+    "Line Item Type":     product_config.get("line_item_type", "N/A"),
+    "Creative Specs":     product_config.get("creative_specs", "N/A"),
+    "Allow RTB":          str(product_config.get("allow_rtb", "N/A")),
+    "Underspend Catchup": product_config.get("underspend_catchup", "N/A"),
 }
 
 st.markdown("**Targeting Details:**")
@@ -986,7 +1213,12 @@ for key, value in rules_data.items():
 st.markdown('<div style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
 st.markdown("## Monetize Setup")
 
-product_rule_str = f"Seat 280 • {product_config.get('line_item_type', 'PG')} • Priority {product_config.get('priority', '-')} • Pacing: {product_config.get('pacing', 'Even')} • Freq Cap: {product_config.get('frequency_cap', 'N/A')} • Publisher: {product_config.get('publisher_targeting', 'N/A')} • Format: {ad_format} • Location: {market}"
+product_rule_str = (
+    f"Seat 280 \u00b7 {product_config.get('line_item_type', 'PG')} \u00b7 Priority {product_config.get('priority', '-')} "
+    f"\u00b7 {product_config.get('pacing', 'Even')} pacing \u00b7 Freq Cap: {product_config.get('frequency_cap', 'N/A')} "
+    f"\u00b7 Targeting: {product_config.get('inventory_targeting', product_config.get('publisher_targeting', 'N/A'))} "
+    f"\u00b7 Ad Sizes: {product_config.get('ad_sizes', 'N/A')} \u00b7 Format: {ad_format} \u00b7 {market}"
+)
 st.info(product_rule_str)
 
 # ================================================================================
@@ -1001,6 +1233,7 @@ if st.button("➕ Add New Flight (Same Product, Different Dates & Budget)", use_
     new_flight = {
         "flight_num": len(st.session_state.flights) + 1,
         "product": product,
+        "publisher": publisher,
         "format": ad_format,
         "device": device,
         "start_date": start_date,
@@ -1012,7 +1245,7 @@ if st.button("➕ Add New Flight (Same Product, Different Dates & Budget)", use_
         "total_cost": total_cost
     }
     st.session_state.flights.append(new_flight)
-    st.success(f"Flight {new_flight['flight_num']} added!")
+    st.success(f"Flight {new_flight['flight_num']} added — {product} | {publisher} {ad_format} | {start_date} to {end_date}")
 
 if st.session_state.flights:
     st.markdown("**Existing Flights:**")
@@ -1020,7 +1253,9 @@ if st.session_state.flights:
         col_flight1, col_flight2, col_flight3 = st.columns([3, 1, 1])
         
         with col_flight1:
-            st.write(f"**Flight {flight['flight_num']}** | {flight['product']} | {flight['start_date']} to {flight['end_date']}")
+            pub_label = flight.get('publisher', publisher)
+            fmt_label = flight.get('format', ad_format)
+            st.write(f"**Flight {flight['flight_num']}** | {flight['product']} | {pub_label} {fmt_label} | {flight['start_date']} → {flight['end_date']}")
         
         with col_flight2:
             st.write(f"{flight['currency']}{flight['total_cost']:,.2f}")
@@ -1038,6 +1273,7 @@ export_flights = st.session_state.flights if st.session_state.flights else [
     {
         "flight_num": 1,
         "product": product,
+        "publisher": publisher,
         "format": ad_format,
         "device": device,
         "start_date": start_date,
@@ -1056,8 +1292,8 @@ export_flights = st.session_state.flights if st.session_state.flights else [
 st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True)
 st.markdown("## Risk & Quality Control")
 
-product_config = PRODUCT_RULES.get(product, {})
-freq_cap_text = product_config.get("frequency_cap", "6 impressions per user per day")
+product_config = get_product_config(product, publisher, ad_format, device)
+freq_cap_text = product_config.get("frequency_cap", "6 imps/day")
 delivery_pressure, pressure_explanation = calculate_delivery_pressure(
     st.session_state.flights if st.session_state.flights else export_flights,
     product,
@@ -1077,27 +1313,91 @@ if isinstance(end_dt, str):
     end_dt = datetime.strptime(end_dt, "%Y-%m-%d").date()
 flight_duration = (end_dt - start_dt).days + 1 if start_dt and end_dt else 0
 
-# Create unified checklist table combining TARGETING SETUP + QC CHECKLIST
+# ── PER-PRODUCT FORECASTING BREAKDOWN ──────────────────────────────────────────
+all_flights_for_forecast = st.session_state.flights if st.session_state.flights else export_flights
+if all_flights_for_forecast:
+    forecast_groups = {}
+    for fl in all_flights_for_forecast:
+        fkey = (
+            fl.get("product", product),
+            fl.get("publisher", publisher),
+            fl.get("format", ad_format),
+        )
+        if fkey not in forecast_groups:
+            forecast_groups[fkey] = {"budget": 0, "impressions": 0, "cpm": fl.get("cpm", cpm_rate), "days": 0, "flights": 0}
+        forecast_groups[fkey]["budget"] += fl.get("budget", 0)
+        forecast_groups[fkey]["impressions"] += fl.get("volume", 0)
+        forecast_groups[fkey]["flights"] += 1
+        sd, ed = fl.get("start_date"), fl.get("end_date")
+        if hasattr(sd, "__sub__") and hasattr(ed, "__sub__"):
+            forecast_groups[fkey]["days"] += (ed - sd).days + 1
+
+    forecast_rows = []
+    grand_budget = grand_imps = 0
+    for (fprod, fpub, ffmt), fdata in forecast_groups.items():
+        daily_avg = fdata["impressions"] / max(1, fdata["days"])
+        forecast_rows.append({
+            "Product": fprod,
+            "Publisher": fpub,
+            "Format": ffmt,
+            "CPM": f"{fdata['cpm']:,.2f} {currency_sym}",
+            "Budget": f"{fdata['budget']:,.2f} {currency_sym}",
+            "Total Imps": f"{fdata['impressions']:,.0f}",
+            "Est. Daily Avg": f"{daily_avg:,.0f}",
+            "Flights": fdata["flights"],
+        })
+        grand_budget += fdata["budget"]
+        grand_imps += fdata["impressions"]
+
+    if len(forecast_groups) > 1:
+        # Add summary row for multi-product plans
+        forecast_rows.append({
+            "Product": "📄 TOTAL", "Publisher": "", "Format": "",
+            "CPM": "—",
+            "Budget": f"{grand_budget:,.2f} {currency_sym}",
+            "Total Imps": f"{grand_imps:,.0f}",
+            "Est. Daily Avg": "—",
+            "Flights": len(all_flights_for_forecast),
+        })
+    if forecast_rows:
+        st.dataframe(
+            pd.DataFrame(forecast_rows), use_container_width=True, hide_index=True,
+            column_config={
+                "Product": st.column_config.TextColumn(width="large"),
+                "Budget": st.column_config.TextColumn(width="medium"),
+                "Total Imps": st.column_config.TextColumn(width="medium"),
+            }
+        )
+
+# ── UNIFIED QC CHECKLIST ────────────────────────────────────────────────────────
 unified_checklist = [
-    ("Priority", product_config.get("priority", "N/A")),
-    ("Frequency Cap", product_config.get("frequency_cap", "N/A")),
-    ("Pacing", product_config.get("pacing", "Even")),
-    ("KV Parameters", "KV pub=msn (MSN)" if publisher == "MSN" else "Direct Inventory (Outlook)" if publisher == "Outlook" else "KV pub=msn (MSN) | Direct (Outlook)"),
-    ("Line Item Type", product_config.get("line_item_type", "N/A")),
-    ("Dates", f"{start_dt.strftime('%m/%d/%Y') if start_dt else 'N/A'} - {end_dt.strftime('%m/%d/%Y') if end_dt else 'N/A'}"),
-    ("Geo Targeting", product_config.get("geo_targeting", "Country required")),
-    ("Delivery Risk Level", delivery_pressure),
-    ("Total Flights", len(st.session_state.flights if st.session_state.flights else export_flights)),
-    ("Flight Duration (days)", flight_duration),
-    ("Est. Daily Impressions", f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
-    ("Total Impressions", f"{total_imp:,.0f}"),
-    ("CPM", f"{cpm_rate:.2f} {currency_sym}"),
-    ("Publisher Targeting", "KV" if publisher == "MSN" else "Direct Inventory"),
-    ("Request Date", datetime.now().strftime("%m/%d/%Y")),
+    ("Product",            f"{product} | {publisher} | {ad_format}"),
+    ("Priority",           product_config.get("priority", "N/A")),
+    ("Line Item Type",     product_config.get("line_item_type", "N/A")),
+    ("Revenue Type",       product_config.get("revenue_type", "CPM")),
+    ("Frequency Cap",      product_config.get("frequency_cap", "N/A")),
+    ("Pacing",             product_config.get("pacing", "Even")),
+    ("Inventory Targeting", product_config.get("inventory_targeting",
+                            product_config.get("publisher_targeting", "N/A"))),
+    ("Supply",             product_config.get("supply", product_config.get("supply_targeting", "N/A"))),
+    ("Ad Sizes",           product_config.get("ad_sizes", "N/A")),
+    ("Device Targeting",   product_config.get("device_targeting", "N/A")),
+    ("Creative Specs",     product_config.get("creative_specs", "N/A")),
+    ("Allow RTB",          str(product_config.get("allow_rtb", "N/A"))),
+    ("Underspend Catchup", product_config.get("underspend_catchup", "N/A")),
+    ("Geo Targeting",      product_config.get("geo_targeting", "Country Targeting")),
+    ("Dates",              f"{start_dt.strftime('%m/%d/%Y') if start_dt else 'N/A'} \u2192 {end_dt.strftime('%m/%d/%Y') if end_dt else 'N/A'}"),
+    ("Flight Duration",    f"{flight_duration} days"),
+    ("Delivery Risk",      delivery_pressure),
+    ("Total Flights",      len(st.session_state.flights if st.session_state.flights else export_flights)),
+    ("Total Impressions",  f"{total_imp:,.0f}"),
+    ("Est. Daily Imps",    f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
+    ("CPM",                f"{cpm_rate:.2f} {currency_sym}"),
+    ("Request Date",       datetime.now().strftime("%m/%d/%Y")),
 ]
 
 # Add video-specific rows when applicable
-if is_video_product(product):
+if is_video_product(product, ad_format):
     unified_checklist.append(("Target VCR (%)", f"{vcr_target}%"))
     unified_checklist.append(("Est. Completed Views", f"{completed_views:,.0f}" if completed_views > 0 else "—"))
     if completed_views > 0 and budget > 0:
@@ -1140,8 +1440,8 @@ with col_export1:
         product_config,
         cpm_rate,
         currency_sym,
-        vcr_target=vcr_target if is_video_product(product) else None,
-        completed_views=completed_views if is_video_product(product) else None
+        vcr_target=vcr_target if is_video_product(product, ad_format) else None,
+        completed_views=completed_views if is_video_product(product, ad_format) else None
     )
     excel_bytes = BytesIO()
     excel_file.save(excel_bytes)
@@ -1165,8 +1465,8 @@ with col_export2:
         product_config,
         cpm_rate,
         currency_sym,
-        vcr_target=vcr_target if is_video_product(product) else None,
-        completed_views=completed_views if is_video_product(product) else None
+        vcr_target=vcr_target if is_video_product(product, ad_format) else None,
+        completed_views=completed_views if is_video_product(product, ad_format) else None
     )
     
     st.download_button(
