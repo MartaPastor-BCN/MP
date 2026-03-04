@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -186,14 +187,14 @@ PRODUCT_RULES = {
         "impression_pacing": "100%",
         "creative_rotation": "N/A",
         "landing_page": "None",
-        "publishers": ["MSN", "Outlook", "ABK", "MCG"],
+        "publishers": ["MSN", "Outlook", "MCG"],
         "formats": ["Banner", "Native", "Video"],
         "priority": 5,
         "frequency_cap": "6 imps/day",
         "pacing": "Even",
         "inventory_type": "Banner",
         "geo_targeting": "Country Targeting",
-        "publisher_targeting": "KV pub = msn / outlook / microsoftcasualgames / abk",
+        "publisher_targeting": "KV pub = msn / outlook / microsoftcasualgames",
         "supply_targeting": "App & Web",
         "publisher_format_config": {
             ("MSN", "Banner"): {
@@ -241,20 +242,6 @@ PRODUCT_RULES = {
                     "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "N/A"},
                 },
             },
-            ("ABK", "Banner"): {
-                "inventory_targeting": "KV pub = abk",
-                "device_config": {
-                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 320x50"},
-                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "300x250, 300x600, 728x90"},
-                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
-                },
-            },
-            ("ABK", "Video"): {
-                "inventory_targeting": "KV pub = abk",
-                "device_config": {
-                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A"},
-                },
-            },
         },
     },
     # ── GDALI IMPRESSIONS ────────────────────────────────────────────────────
@@ -268,14 +255,14 @@ PRODUCT_RULES = {
         "impression_pacing": "100%",
         "creative_rotation": "Evenly",
         "landing_page": "None",
-        "publishers": ["MSN", "Outlook"],
+        "publishers": ["MSN", "Outlook", "MCG"],
         "formats": ["Banner", "Native", "Video"],
         "priority": 5,
         "frequency_cap": "6 imps/day",
         "pacing": "Even",
         "inventory_type": "Banner",
         "geo_targeting": "Country Targeting",
-        "publisher_targeting": "KV pub = msn (MSN) | KV pub = outlook (Outlook)",
+        "publisher_targeting": "KV pub = msn (MSN) | KV pub = outlook (Outlook) | KV pub = microsoftcasualgames (MCG)",
         "supply_targeting": "App & Web",
         "publisher_format_config": {
             ("MSN", "Banner"): {
@@ -312,6 +299,24 @@ PRODUCT_RULES = {
                     "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "N/A", "min_creatives": 2},
                     "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "N/A", "min_creatives": 2},
                     "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "N/A", "min_creatives": 1},
+                },
+            },
+            ("MCG", "Banner"): {
+                "inventory_targeting": "KV pub = microsoftcasualgames",
+                "creative_specs": "300x250, 300x600, 728x90, 320x50",
+                "min_creatives": 1,
+                "device_config": {
+                    "All Devices": {"supply": "App & Web", "device_targeting": "Desktop, Mobile, Tablet", "ad_sizes": "300x250, 300x600, 728x90, 320x50"},
+                    "Desktop":     {"supply": "Web Only",  "device_targeting": "Desktop, Tablet",          "ad_sizes": "300x250, 300x600, 728x90"},
+                    "Mobile":      {"supply": "App & Web", "device_targeting": "Mobile, Tablet",           "ad_sizes": "320x50"},
+                },
+            },
+            ("MCG", "Video"): {
+                "inventory_targeting": "KV pub = microsoftcasualgames",
+                "creative_specs": "15 seconds OR 30 seconds",
+                "min_creatives": 1,
+                "device_config": {
+                    "Desktop": {"supply": "Web Only", "device_targeting": "Desktop, Tablet", "ad_sizes": "N/A"},
                 },
             },
         },
@@ -438,8 +443,8 @@ REGION_CURRENCY = {
 # CPM reference ranges by product + format (align with DNV Rate Card)
 CPM_RECOMMENDATIONS = {
     "PG - First Impression":        {"min": 15,   "default": 20,    "max": 40,    "note": "Premium first-in-page · MSN Banner"},
-    "PG - Standard":                {"min": 8,    "default": 12,    "max": 25,    "note": "Banner/Native · MSN, Outlook, ABK, MCG"},
-    "PG - Standard (Video)":        {"min": 25,   "default": 35,    "max": 65,    "note": "Video · MSN, ABK, MCG"},
+    "PG - Standard":                {"min": 8,    "default": 12,    "max": 25,    "note": "Banner/Native · MSN, Outlook, MCG"},
+    "PG - Standard (Video)":        {"min": 25,   "default": 35,    "max": 65,    "note": "Video · MSN, MCG"},
     "GDALI - Impressions":          {"min": 8,    "default": 12,    "max": 25,    "note": "GDALI Guaranteed · Banner/Native"},
     "GDALI - Impressions (Video)":  {"min": 25,   "default": 35,    "max": 65,    "note": "GDALI Guaranteed · Video · MSN"},
     "GDALI - MSN Takeover":         {"min": 5000, "default": 15000, "max": 50000, "note": "Fixed Fee per day (not a CPM product)"},
@@ -467,6 +472,24 @@ def get_compatible_formats(product, publisher):
             return sorted(set(pub_formats), key=["Banner", "Native", "Video"].index
                           if all(f in ["Banner", "Native", "Video"] for f in pub_formats) else str)
     return all_formats
+
+
+def get_compatible_devices(product, publisher, ad_format):
+    """Return valid device options constrained by the product × publisher × format device_config."""
+    _order = ["All Devices", "Desktop", "Mobile", "Tablet"]
+    product_info = PRODUCT_RULES.get(product, {})
+    pfc = product_info.get("publisher_format_config", {})
+    key = (publisher, ad_format)
+
+    if key in pfc:
+        dev_cfg = pfc[key].get("device_config", {})
+    else:
+        dev_cfg = product_info.get("device_config", {})
+
+    if dev_cfg:
+        devices = [d for d in _order if d in dev_cfg]
+        return devices if devices else list(dev_cfg.keys())
+    return ["All Devices", "Desktop", "Mobile"]
 
 
 def get_product_config(product, publisher, ad_format, device="All Devices"):
@@ -516,6 +539,106 @@ def get_default_cpm(product_name, ad_format=None):
         if video_key in CPM_RECOMMENDATIONS:
             return float(CPM_RECOMMENDATIONS[video_key]["default"])
     return float(CPM_RECOMMENDATIONS.get(product_name, {"default": 10.0})["default"])
+
+# ── DEAL-TYPE / FORMAT RESOLUTION ────────────────────────────────────────────
+
+# Spec §4.3 — allowed formats per deal type
+_FORMAT_ALLOWLIST = {
+    "GDALI - Impressions":      ["Banner", "Video", "Native"],
+    "GDALI - MSN Takeover":     ["Banner"],
+    "GDALI - Outlook Takeover": ["Banner", "Native"],
+    "PG - Standard":            ["Banner", "Video", "Native"],
+    "PG - First Impression":    ["Banner"],
+    "High Impact":              ["Banner"],
+}
+
+def is_cpd_product(product: str) -> bool:
+    """True for Fixed Fee (Cost Per Day) products — Takeovers."""
+    return PRODUCT_RULES.get(product, {}).get("revenue_type", "") == "Fixed Fee (Cost Per Day)"
+
+def resolve_inventory_type(ad_format: str) -> str:
+    """Spec §4.1: Video/Native must be App & Web; Banner is Web Only."""
+    return "App & Web" if ad_format in ("Video", "Native") else "Web Only"
+
+def resolve_inventory_targeting_mode(publisher: str, ad_format: str) -> str:
+    """Spec §4.2: KV targeting for MSN/MCG; Publisher ID for Outlook Native."""
+    if publisher == "Outlook" and ad_format == "Native":
+        return "Publisher ID — Outlook Native (1000230)"
+    mapping = {
+        "MSN":     "Key/Value — pub = msn",
+        "Outlook": "Key/Value — pub = outlook",
+        "MCG":     "Key/Value — pub = microsoftcasualgames",
+    }
+    return mapping.get(publisher, f"Key/Value — pub = {publisher.lower()}")
+
+def validate_deal_format(product: str, ad_format: str) -> tuple[bool, str]:
+    """Spec §4.3: Return (valid, reason). One format per line item; format must be allowed."""
+    allowed = _FORMAT_ALLOWLIST.get(product, ["Banner", "Video", "Native"])
+    if ad_format not in allowed:
+        return False, f"{ad_format} is not allowed for {product} (allowed: {', '.join(allowed)})"
+    return True, ""
+
+# Spec §4.4 — canonical banner sizes per publisher × device
+_BANNER_SIZES = {
+    ("MSN",     "All Devices"): ["300x250", "300x600", "728x90", "970x250", "320x50"],
+    ("MSN",     "Desktop"):     ["970x250", "728x90", "300x250", "300x600"],
+    ("MSN",     "Mobile"):      ["320x50"],
+    ("Outlook", "Desktop"):     ["160x600", "728x90", "300x250", "300x600"],
+    ("MCG",     "All Devices"): ["300x250", "300x600", "728x90", "320x50"],
+    ("MCG",     "Desktop"):     ["300x250", "300x600", "728x90"],
+    ("MCG",     "Mobile"):      ["320x50"],
+}
+
+def get_allowed_banner_sizes(publisher: str, device: str) -> list:
+    """Spec §4.4: Canonical sizes for publisher × device. Returns list of size strings."""
+    return _BANNER_SIZES.get((publisher, device), _BANNER_SIZES.get((publisher, "All Devices"), []))
+
+def get_freq_cap_numeric(product: str) -> int:
+    """Extract numeric frequency cap from product rules. Returns 0 if uncapped/CPD."""
+    cap_text = PRODUCT_RULES.get(product, {}).get("frequency_cap", "")
+    if cap_text in ("Off", "N/A", "") or is_cpd_product(product):
+        return 0
+    if "1 imp" in cap_text:
+        return 1
+    if "6 imp" in cap_text:
+        return 6
+    return 6  # safe default
+
+
+# ── FORECASTING FORMULAS (Spec §6) ───────────────────────────────────────────
+
+def calc_avg_daily_uniques(total_impressions: float, flight_days: int,
+                           freq_cap_num: int) -> float:
+    """
+    Spec §6.3: Avg Uniques (Daily) at product level.
+    Estimate = daily_impressions / freq_cap  (users × exposures/user = impressions).
+    When freq_cap is 0 (uncapped/CPD) returns 0 (not applicable).
+    """
+    if flight_days <= 0 or freq_cap_num <= 0:
+        return 0.0
+    daily_imps = total_impressions / flight_days
+    return daily_imps / freq_cap_num
+
+def calc_avg_frequency_daily(total_impressions: float, avg_daily_uniques: float,
+                             flight_days: int) -> float:
+    """
+    Spec §6.1: Avg Frequency (Daily) = daily_impressions / daily_uniques.
+    Returns 0 when not applicable (CPD / uncapped / no uniques).
+    """
+    if flight_days <= 0 or avg_daily_uniques <= 0:
+        return 0.0
+    return (total_impressions / flight_days) / avg_daily_uniques
+
+def calc_lifetime_uniques(avg_daily_uniques: float, turnover_per_day: float,
+                          days_lifetime: int) -> float:
+    """
+    Spec §6.4: Lifetime Uniques = avg_daily_uniques × (1 + turnover × (days - 1)).
+    Not applicable for CPD products (caller must guard).
+    """
+    if avg_daily_uniques <= 0 or days_lifetime <= 0:
+        return 0.0
+    return avg_daily_uniques * (1 + turnover_per_day * (days_lifetime - 1))
+
 
 def calculate_delivery_pressure(flights_list, product_name, frequency_cap_text=""):
     """
@@ -793,9 +916,20 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
 
     grand_budget = grand_imps = 0
     for (fprod, fpub, ffmt), fd in fgroups.items():
-        daily = fd["imps"] / max(1, fd["days"])
-        row_data = [fprod, fpub, ffmt, f"{fd['cpm']:,.2f} {currency_sym}",
-                    f"{fd['budget']:,.2f} {currency_sym}", f"{fd['imps']:,.0f}", f"{daily:,.0f}"]
+        _is_cpd_fl = is_cpd_product(fprod)
+        if _is_cpd_fl:
+            row_data = [fprod, fpub, ffmt,
+                        f"Fixed Fee (CPD)",
+                        f"{fd['budget']:,.2f} {currency_sym}",
+                        f"{fd['days']} day(s)",
+                        f"{fd['budget']/max(1,fd['days']):,.2f} {currency_sym}/day"]
+        else:
+            daily = fd["imps"] / max(1, fd["days"])
+            row_data = [fprod, fpub, ffmt,
+                        f"{fd['cpm']:,.2f} {currency_sym}",
+                        f"{fd['budget']:,.2f} {currency_sym}",
+                        f"{fd['imps']:,.0f}",
+                        f"{daily:,.0f}"]
         for col, val in enumerate(row_data, 1):
             ws.cell(row=forecast_row, column=col).value = val
         grand_budget += fd["budget"]
@@ -803,7 +937,6 @@ def create_excel_export(flights_list, campaign_info, delivery_pressure_label, pr
         forecast_row += 1
 
     if len(fgroups) > 1:
-        # TOTAL row
         total_row = ["TOTAL", "", "", "—", f"{grand_budget:,.2f} {currency_sym}", f"{grand_imps:,.0f}", "—"]
         for col, val in enumerate(total_row, 1):
             c = ws.cell(row=forecast_row, column=col)
@@ -941,19 +1074,27 @@ def create_pdf_export(flights_list, campaign_info, delivery_pressure_label, prod
     forecast_data = [["Product", "Publisher", "Format", "CPM", "Budget", "Total Imps", "Daily Avg"]]
     grand_budget = grand_imps = 0
     for (fprod, fpub, ffmt), fd in fgroups.items():
-        daily = fd["imps"] / max(1, fd["days"])
-        forecast_data.append([fprod, fpub, ffmt,
-                               f"{fd['cpm']:,.2f} {currency_sym}",
-                               f"{fd['budget']:,.2f} {currency_sym}",
-                               f"{fd['imps']:,.0f}",
-                               f"{daily:,.0f}"])
+        _is_cpd_fl = is_cpd_product(fprod)
+        if _is_cpd_fl:
+            forecast_data.append([fprod, fpub, ffmt,
+                                   "Fixed Fee (CPD)",
+                                   f"{fd['budget']:,.2f} {currency_sym}",
+                                   f"{fd['days']} day(s)",
+                                   f"{fd['budget']/max(1,fd['days']):,.2f} {currency_sym}/day"])
+        else:
+            daily = fd["imps"] / max(1, fd["days"])
+            forecast_data.append([fprod, fpub, ffmt,
+                                   f"{fd['cpm']:,.2f} {currency_sym}",
+                                   f"{fd['budget']:,.2f} {currency_sym}",
+                                   f"{fd['imps']:,.0f}",
+                                   f"{daily:,.0f}"])
         grand_budget += fd["budget"]
         grand_imps += fd["imps"]
 
     if len(fgroups) > 1:
         forecast_data.append(["TOTAL", "", "", "—",
                                f"{grand_budget:,.2f} {currency_sym}",
-                               f"{grand_imps:,.0f}", "—"])
+                               "—", "—"])
 
     if vcr_target is not None:
         forecast_data.append(["Target VCR (%)", f"{vcr_target}%", "", "", "", "", ""])
@@ -1016,20 +1157,24 @@ with col3:
 with col4:
     publisher = st.selectbox(
         "Publisher",
-        ["MSN", "Outlook", "ABK", "MCG"],
+        ["MSN", "Outlook", "MCG"],
         key="publisher",
-        help="Target publisher (MSN, Outlook, ABK = Activision Blizzard King, MCG = Microsoft Casual Games)"
+        help="Target publisher (MSN, Outlook, MCG = Microsoft Casual Games)"
     )
     st.session_state.campaign_details["publisher"] = publisher
 
 col5, col6, col7, col8 = st.columns(4)
 
 with col5:
+    _tmp_product = st.session_state.get("product", list(PRODUCT_RULES.keys())[0])
+    _tmp_publisher = st.session_state.get("publisher", "MSN")
+    _tmp_format = st.session_state.get("format", "Banner")
+    _compatible_devices = get_compatible_devices(_tmp_product, _tmp_publisher, _tmp_format)
     device = st.selectbox(
         "Device",
-        ["All Devices", "Desktop", "Mobile", "Tablet"],
+        _compatible_devices,
         key="device",
-        help="Target device type"
+        help="Device options filtered by product · publisher · format"
     )
     st.session_state.campaign_details["device"] = device
 
@@ -1054,8 +1199,20 @@ with col7:
 with col8:
     st.write("")
 
-col9, col10 = st.columns(2)
+# ── Inline config validation (Spec §4.2–4.3) ─────────────────────────────────
+_early_fmt_valid, _early_fmt_err = validate_deal_format(product, ad_format)
+if not _early_fmt_valid:
+    st.error(f"❌ **Format conflict:** {_early_fmt_err}")
+if publisher == "Outlook" and ad_format == "Video":
+    st.error("❌ **Outlook Video does not exist.** Select Banner or Native for Outlook.")
+_early_inv_type = resolve_inventory_type(ad_format)
+_early_inv_mode = resolve_inventory_targeting_mode(publisher, ad_format)
+st.caption(
+    f"🔒 Inventory: **{_early_inv_type}** · Targeting Mode: **{_early_inv_mode}** "
+    f"· Format enforcement: {'✅' if _early_fmt_valid else '❌'}"
+)
 
+col9, col10 = st.columns(2)
 with col9:
     start_date = st.date_input(
         "Start Date",
@@ -1100,55 +1257,85 @@ st.markdown('<div style="margin-bottom: 1.5rem;"></div>', unsafe_allow_html=True
 currency_sym = get_currency_symbol(market)
 currency_code = REGION_CURRENCY.get(market.upper(), ("USD", "$"))[0]
 
-st.markdown("**Forecasting:** Impressions = (Spend ÷ CPM) × 1,000")
+# ── Pricing varies by product type: CPD for Takeovers, CPM for everything else ──
+_takeover = is_cpd_product(product)
 
-col_price1, col_price2, col_price3 = st.columns(3)
+# Initialize video defaults (may be overwritten below)
+vcr_target = 75
+completed_views = 0
+video_duration = None
+cpm_rate = 0.0
+impressions = 0
+budget = 0.0
+_cpd_rate = 0.0
+_flight_days_pricing = max(1, (end_date - start_date).days + 1)
 
-with col_price1:
-    budget = st.number_input(
-        f"Budget/Spend ({currency_sym})",
-        min_value=0.0,
-        value=1000.0,
-        step=0.01,
-        key="budget_value"
+if _takeover:
+    # ── CPD mode ─────────────────────────────────────────────────────────────
+    st.markdown("**Forecasting (CPD):** Total Cost = Daily Rate × Number of Days")
+    _rec = CPM_RECOMMENDATIONS.get(product, {"default": 10000, "min": 3000, "max": 50000, "note": "Fixed Fee per day"})
+    col_price1, col_price2, col_price3 = st.columns(3)
+    with col_price1:
+        _cpd_rate = st.number_input(
+            f"Daily Rate / Cost Per Day ({currency_sym})",
+            min_value=0.0,
+            value=float(_rec["default"]),
+            step=100.0,
+            key="budget_value",
+            help=f"{_rec.get('note','')} · Align with DNV Rate Card"
+        )
+    with col_price2:
+        st.metric("Flight Duration", f"{_flight_days_pricing} days")
+    with col_price3:
+        total_cpd_cost = _cpd_rate * _flight_days_pricing
+        st.metric("Total Estimated Cost", f"{currency_sym}{total_cpd_cost:,.2f}")
+    budget = total_cpd_cost
+    cpm_rate = 0.0
+    impressions = 0.0
+    st.info(
+        f"📅 **{product}** · Fixed Fee · "
+        f"{currency_sym}{_cpd_rate:,.2f}/day × {_flight_days_pricing} days = "
+        f"**{currency_sym}{total_cpd_cost:,.2f} total**  ·  Confirm rate with DNV Rate Card for {market}."
     )
-
-with col_price2:
+else:
+    # ── CPM mode ─────────────────────────────────────────────────────────────
+    st.markdown("**Forecasting:** Impressions = (Spend ÷ CPM) × 1,000")
     _cpm_key = f"{product} (Video)" if ad_format == "Video" and f"{product} (Video)" in CPM_RECOMMENDATIONS else product
     _cpm_rec = CPM_RECOMMENDATIONS.get(_cpm_key, {"default": get_default_cpm(product, ad_format), "min": 5.0, "max": 200.0, "note": ""})
-    cpm_rate = st.number_input(
-        f"CPM ({currency_sym})",
-        min_value=0.01,
-        value=float(_cpm_rec["default"]),
-        step=0.01,
-        key="cpm_rate",
-        help=f"{_cpm_rec.get('note', '')} · Align with DNV Rate Card"
-    )
-
-with col_price3:
-    if cpm_rate > 0:
-        impressions = (budget / cpm_rate) * 1000
+    col_price1, col_price2, col_price3 = st.columns(3)
+    with col_price1:
+        budget = st.number_input(
+            f"Budget/Spend ({currency_sym})",
+            min_value=0.0,
+            value=1000.0,
+            step=0.01,
+            key="budget_value"
+        )
+    with col_price2:
+        cpm_rate = st.number_input(
+            f"CPM ({currency_sym})",
+            min_value=0.01,
+            value=float(_cpm_rec["default"]),
+            step=0.01,
+            key="cpm_rate",
+            help=f"{_cpm_rec.get('note', '')} · Align with DNV Rate Card"
+        )
+    with col_price3:
+        impressions = (budget / cpm_rate) * 1000 if cpm_rate > 0 else 0.0
         st.metric("Calculated Impressions", f"{impressions:,.0f}")
-    else:
-        impressions = 0
-        st.metric("Calculated Impressions", "0")
+    st.caption(f"💡 Align CPM {currency_sym}{cpm_rate:.2f} with the DNV Rate Card for **{market}** · {_cpm_rec.get('note', '')}")
 
 total_cost = budget
 
-# Initialize video defaults
-vcr_target = 75
-completed_views = 0
-
-# CPM alignment note (no pass/fail — user must verify against Rate Card)
-_takeover = "Takeover" in product
-if _takeover:
-    st.info(f"ℹ️ **{product}** uses a Fixed Fee (Cost Per Day), not CPM. Confirm the daily rate with the Rate Card for {market}.")
-else:
-    st.caption(f"💡 Align CPM {currency_sym}{cpm_rate:.2f} with the DNV Rate Card for **{market}** · {_cpm_rec.get('note', '')}")
-
-# Video-specific metrics (shown only when Video format is selected)
-if is_video_product(product, ad_format):
+# Video-specific metrics (CPM products only)
+if not _takeover and is_video_product(product, ad_format):
     st.markdown("**🎥 Video Metrics**")
+    _dur_col, _ = st.columns([1, 3])
+    with _dur_col:
+        video_duration = st.selectbox(
+            "Creative Duration", ["15 seconds", "30 seconds"], key="video_duration",
+            help="Video creative length · affects creative specs and delivery setup"
+        )
     col_vid1, col_vid2, col_vid3 = st.columns(3)
     with col_vid1:
         vcr_target = st.slider(
@@ -1164,6 +1351,52 @@ if is_video_product(product, ad_format):
             st.metric("Est. Cost / Completed View", f"{currency_sym}{cost_per_view:.4f}")
         else:
             st.metric("Est. Cost / Completed View", "—")
+
+# ── AUDIENCE & FREQUENCY ESTIMATION (Spec §6) ────────────────────────────────
+_is_cpd = is_cpd_product(product)
+_freq_cap_num = get_freq_cap_numeric(product)
+
+# Pre-compute base metrics for current flight window
+_flight_days_est = max(1, (end_date - start_date).days + 1)
+_avg_daily_uniques_est = calc_avg_daily_uniques(impressions, _flight_days_est, _freq_cap_num)
+_avg_freq_est          = calc_avg_frequency_daily(impressions, _avg_daily_uniques_est, _flight_days_est)
+
+# Turnover rate slider — only when forecasting is applicable
+_turnover_rate = 0.0
+_lifetime_uniques_est = 0.0
+if not _is_cpd and _freq_cap_num > 0:
+    st.markdown("**Audience Reach Forecast** _(applicable only to CPM products)_")
+    _aud_col1, _aud_col2, _aud_col3, _aud_col4 = st.columns(4)
+    with _aud_col1:
+        _turnover_rate = st.slider(
+            "Daily Audience Turnover (%)", min_value=5, max_value=50,
+            value=30, step=5,
+            help="% of unique users refreshing per day — 25–35 % is typical for MSN/Outlook",
+            key="turnover_rate",
+        ) / 100.0
+    with _aud_col2:
+        st.metric("Est. Avg Daily Uniques", f"{_avg_daily_uniques_est:,.0f}",
+                  help="daily_impressions ÷ freq_cap")
+    with _aud_col3:
+        st.metric("Est. Avg Daily Frequency", f"{_avg_freq_est:.2f}",
+                  help="daily_impressions ÷ daily_uniques")
+    with _aud_col4:
+        _lifetime_uniques_est = calc_lifetime_uniques(
+            _avg_daily_uniques_est, _turnover_rate, _flight_days_est
+        )
+        st.metric("Est. Lifetime Uniques", f"{_lifetime_uniques_est:,.0f}",
+                  help="avg_daily_uniques × (1 + turnover × (days − 1))")
+elif _is_cpd:
+    # ── CPD summary panel ──────────────────────────────────────────────────
+    st.markdown("**📅 CPD Delivery Forecast** _(Fixed Fee — time-based delivery)_")
+    _cpd_col1, _cpd_col2, _cpd_col3 = st.columns(3)
+    with _cpd_col1:
+        st.metric("Daily Rate", f"{currency_sym}{_cpd_rate:,.2f}")
+    with _cpd_col2:
+        st.metric("Takeover Days", f"{_flight_days_est}")
+    with _cpd_col3:
+        st.metric("Total Fee", f"{currency_sym}{_cpd_rate * _flight_days_est:,.2f}")
+    st.caption("📌 Impression frequency metrics are **not applicable** for CPD products — SOV delivery is exclusive and time-gated.")
 
 # ================================================================================
 # 5. TARGETING RULES (LOCKED BY PRODUCT)
@@ -1242,7 +1475,8 @@ if st.button("➕ Add New Flight (Same Product, Different Dates & Budget)", use_
         "cpm": cpm_rate,
         "volume": impressions,
         "currency": currency_sym,
-        "total_cost": total_cost
+        "total_cost": total_cost,
+        "duration": video_duration,
     }
     st.session_state.flights.append(new_flight)
     st.success(f"Flight {new_flight['flight_num']} added — {product} | {publisher} {ad_format} | {start_date} to {end_date}")
@@ -1335,17 +1569,47 @@ if all_flights_for_forecast:
     forecast_rows = []
     grand_budget = grand_imps = 0
     for (fprod, fpub, ffmt), fdata in forecast_groups.items():
-        daily_avg = fdata["impressions"] / max(1, fdata["days"])
-        forecast_rows.append({
-            "Product": fprod,
-            "Publisher": fpub,
-            "Format": ffmt,
-            "CPM": f"{fdata['cpm']:,.2f} {currency_sym}",
-            "Budget": f"{fdata['budget']:,.2f} {currency_sym}",
-            "Total Imps": f"{fdata['impressions']:,.0f}",
-            "Est. Daily Avg": f"{daily_avg:,.0f}",
-            "Flights": fdata["flights"],
-        })
+        _fcap = get_freq_cap_numeric(fprod)
+        _cpd  = is_cpd_product(fprod)
+        if _cpd:
+            # CPD row: budget-based, no impressions
+            _days = max(1, fdata["days"])
+            _daily_rate = fdata["budget"] / _days
+            forecast_rows.append({
+                "Product": fprod,
+                "Publisher": fpub,
+                "Format": ffmt,
+                "Pricing": "Fixed Fee (CPD)",
+                "Budget / Total Fee": f"{fdata['budget']:,.2f} {currency_sym}",
+                "Duration": f"{_days} day(s)",
+                "Daily Rate": f"{_daily_rate:,.2f} {currency_sym}/day",
+                "Total Imps": "SOV — N/A",
+                "Est. Daily Avg": "—",
+                "Avg Daily Uniques": "N/A (CPD)",
+                "Avg Frequency": "N/A (CPD)",
+                "Lifetime Uniques": "N/A (CPD)",
+                "Flights": fdata["flights"],
+            })
+        else:
+            daily_avg = fdata["impressions"] / max(1, fdata["days"])
+            _du = calc_avg_daily_uniques(fdata["impressions"], max(1, fdata["days"]), _fcap)
+            _fr = calc_avg_frequency_daily(fdata["impressions"], _du, max(1, fdata["days"]))
+            _lu = calc_lifetime_uniques(_du, _turnover_rate, max(1, fdata["days"])) if _du > 0 else 0
+            forecast_rows.append({
+                "Product": fprod,
+                "Publisher": fpub,
+                "Format": ffmt,
+                "Pricing": f"CPM {fdata['cpm']:,.2f} {currency_sym}",
+                "Budget / Total Fee": f"{fdata['budget']:,.2f} {currency_sym}",
+                "Duration": f"{max(1,fdata['days'])} day(s)",
+                "Daily Rate": "—",
+                "Total Imps": f"{fdata['impressions']:,.0f}",
+                "Est. Daily Avg": f"{daily_avg:,.0f}",
+                "Avg Daily Uniques": f"{_du:,.0f}" if _fcap > 0 else "Uncapped",
+                "Avg Frequency": f"{_fr:.2f}" if _fcap > 0 else "Uncapped",
+                "Lifetime Uniques": f"{_lu:,.0f}" if _lu > 0 else "—",
+                "Flights": fdata["flights"],
+            })
         grand_budget += fdata["budget"]
         grand_imps += fdata["impressions"]
 
@@ -1353,10 +1617,15 @@ if all_flights_for_forecast:
         # Add summary row for multi-product plans
         forecast_rows.append({
             "Product": "📄 TOTAL", "Publisher": "", "Format": "",
-            "CPM": "—",
-            "Budget": f"{grand_budget:,.2f} {currency_sym}",
-            "Total Imps": f"{grand_imps:,.0f}",
+            "Pricing": "—",
+            "Budget / Total Fee": f"{grand_budget:,.2f} {currency_sym}",
+            "Duration": "—",
+            "Daily Rate": "—",
+            "Total Imps": f"{grand_imps:,.0f}" if grand_imps > 0 else "—",
             "Est. Daily Avg": "—",
+            "Avg Daily Uniques": "—",
+            "Avg Frequency": "—",
+            "Lifetime Uniques": "—",
             "Flights": len(all_flights_for_forecast),
         })
     if forecast_rows:
@@ -1370,6 +1639,11 @@ if all_flights_for_forecast:
         )
 
 # ── UNIFIED QC CHECKLIST ────────────────────────────────────────────────────────
+_inv_type      = resolve_inventory_type(ad_format)
+_inv_tgt_mode  = resolve_inventory_targeting_mode(publisher, ad_format)
+_fmt_valid, _fmt_err = validate_deal_format(product, ad_format)
+_allowed_sizes = get_allowed_banner_sizes(publisher, device) if ad_format == "Banner" else []
+
 unified_checklist = [
     ("Product",            f"{product} | {publisher} | {ad_format}"),
     ("Priority",           product_config.get("priority", "N/A")),
@@ -1377,10 +1651,17 @@ unified_checklist = [
     ("Revenue Type",       product_config.get("revenue_type", "CPM")),
     ("Frequency Cap",      product_config.get("frequency_cap", "N/A")),
     ("Pacing",             product_config.get("pacing", "Even")),
+    # Spec §4.1–4.2: resolved inventory + targeting mode
+    ("Inventory Type",     _inv_type),
+    ("Inventory Targeting Mode", _inv_tgt_mode),
     ("Inventory Targeting", product_config.get("inventory_targeting",
                             product_config.get("publisher_targeting", "N/A"))),
     ("Supply",             product_config.get("supply", product_config.get("supply_targeting", "N/A"))),
     ("Ad Sizes",           product_config.get("ad_sizes", "N/A")),
+    # Spec §4.4: canonical allowed sizes
+    ("Allowed Banner Sizes", ", ".join(_allowed_sizes) if _allowed_sizes else "N/A (non-Banner)"),
+    # Spec §4.3: format validation
+    ("Format Validation",  "✅ Valid" if _fmt_valid else f"❌ INVALID — {_fmt_err}"),
     ("Device Targeting",   product_config.get("device_targeting", "N/A")),
     ("Creative Specs",     product_config.get("creative_specs", "N/A")),
     ("Allow RTB",          str(product_config.get("allow_rtb", "N/A"))),
@@ -1390,14 +1671,35 @@ unified_checklist = [
     ("Flight Duration",    f"{flight_duration} days"),
     ("Delivery Risk",      delivery_pressure),
     ("Total Flights",      len(st.session_state.flights if st.session_state.flights else export_flights)),
-    ("Total Impressions",  f"{total_imp:,.0f}"),
-    ("Est. Daily Imps",    f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
-    ("CPM",                f"{cpm_rate:.2f} {currency_sym}"),
+    # CPD vs CPM pricing rows
+    *([("Total Fixed Fee",   f"{budget:,.2f} {currency_sym}"),
+       ("Daily Rate",        f"{_cpd_rate:,.2f} {currency_sym}/day"),
+       ("Takeover Days",     f"{_flight_days_pricing}"),
+       ("Impressions",       "SOV — N/A (Fixed Fee)")] if _takeover else
+      [("Total Impressions", f"{total_imp:,.0f}"),
+       ("Est. Daily Imps",   f"{total_imp/flight_duration:,.0f}" if flight_duration > 0 else "0"),
+       ("CPM",               f"{cpm_rate:.2f} {currency_sym}")]),
     ("Request Date",       datetime.now().strftime("%m/%d/%Y")),
 ]
 
+# Spec §6 + §8: Forecasting metrics — guarded by CPD check
+if not _is_cpd and _freq_cap_num > 0:
+    unified_checklist += [
+        ("── Audience Forecast ──", ""),
+        ("Est. Avg Daily Uniques",  f"{_avg_daily_uniques_est:,.0f}"),
+        ("Est. Avg Daily Frequency", f"{_avg_freq_est:.2f}"),
+        ("Daily Turnover Rate",     f"{int(_turnover_rate * 100)}%"),
+        ("Est. Lifetime Uniques",   f"{_lifetime_uniques_est:,.0f}"),
+    ]
+elif _is_cpd:
+    unified_checklist.append(("Audience Forecast", "❌ N/A — Fixed Fee (CPD) product"))
+else:
+    unified_checklist.append(("Audience Forecast", "❌ N/A — Uncapped product"))
+
 # Add video-specific rows when applicable
 if is_video_product(product, ad_format):
+    if video_duration:
+        unified_checklist.append(("Creative Duration", video_duration))
     unified_checklist.append(("Target VCR (%)", f"{vcr_target}%"))
     unified_checklist.append(("Est. Completed Views", f"{completed_views:,.0f}" if completed_views > 0 else "—"))
     if completed_views > 0 and budget > 0:
@@ -1447,10 +1749,16 @@ with col_export1:
     excel_file.save(excel_bytes)
     excel_bytes.seek(0)
     
+    _adv_slug   = re.sub(r"[^\w]", "_", advertiser or "Plan")[:20].strip("_")
+    _mkt_slug   = re.sub(r"[^\w]", "_", market or "MKT")[:6].strip("_")
+    _prod_slug  = re.sub(r"[^\w]", "_", product or "Product")[:14].strip("_")
+    _date_slug  = datetime.now().strftime("%Y%m%d")
+    _base_name  = f"{_adv_slug}_{_mkt_slug}_{_prod_slug}_{_date_slug}"
+
     st.download_button(
         label="📊 IO (Excel)",
         data=excel_bytes.getvalue(),
-        file_name="MediaPlan_IO.xlsx",
+        file_name=f"{_base_name}_IO.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
         help="Microsoft-style Excel file with campaign details and forecasting"
@@ -1472,7 +1780,7 @@ with col_export2:
     st.download_button(
         label="📄 IO (PDF)",
         data=pdf_buffer.getvalue(),
-        file_name="MediaPlan_IO.pdf",
+        file_name=f"{_base_name}_IO.pdf",
         mime="application/pdf",
         use_container_width=True,
         help="PDF version of the media plan"
@@ -1489,7 +1797,7 @@ with col_export3:
     st.download_button(
         label="🔒 Internal Setup (Excel)",
         data=internal_bytes.getvalue(),
-        file_name="MediaPlan_InternalSetup.xlsx",
+        file_name=f"{_base_name}_InternalSetup.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
         help="Internal-facing Excel with targeting setup and QC checklist"
