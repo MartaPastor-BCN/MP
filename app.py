@@ -685,117 +685,95 @@ def calculate_delivery_pressure(flights_list, product_name, frequency_cap_text="
     else:
         return "High", f"Flight duration {flight_days} days. High daily volume vs. frequency cap. Escalate to ops team."
 
-def create_internal_excel_export(flights_list, campaign_info, delivery_pressure_label):
-    """Create internal-facing Excel with targeting setup and QC checklist."""
+def create_internal_excel_export(flights_list, campaign_info, delivery_pressure_label,
+                                 product_config, unified_checklist):
+    """Create internal-facing Excel with targeting setup and QC checklist,
+    fully aligned with the on-screen Risk & Quality Control section."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Internal Setup"
-    
-    header_fill = PatternFill(start_color="0078D4", end_color="0078D4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                   top=Side(style='thin'), bottom=Side(style='thin'))
-    
-    # Header
-    ws.merge_cells("A1:M1")
+
+    section_font = Font(bold=True, size=11, color="0078D4")
+    header_fill  = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+    header_font  = Font(bold=True)
+
+    # ── Title ────────────────────────────────────────────────────────────────
+    ws.merge_cells("A1:B1")
     title = ws["A1"]
     title.value = "Media Plan - Internal Setup & QC"
     title.font = Font(bold=True, size=14, color="0078D4")
-    
-    # Campaign details
+
+    # ── Campaign details ─────────────────────────────────────────────────────
     row = 3
-    ws[f"A{row}"] = "Campaign Name:"
-    ws[f"B{row}"] = campaign_info.get("campaign", "")
+    for label, key in [("Campaign Name:", "campaign"), ("Advertiser:", "advertiser"),
+                        ("Market:", "market"), ("Publisher:", "publisher"),
+                        ("Product:", "product")]:
+        ws[f"A{row}"] = label
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"B{row}"] = campaign_info.get(key, "")
+        row += 1
+
+    # ── INTERNAL SETUP & TARGETING (product-specific) ────────────────────────
     row += 1
-    ws[f"A{row}"] = "Advertiser:"
-    ws[f"B{row}"] = campaign_info.get("advertiser", "")
-    row += 1
-    ws[f"A{row}"] = "Market:"
-    ws[f"B{row}"] = campaign_info.get("market", "")
-    row += 1
-    ws[f"A{row}"] = "Publisher:"
-    ws[f"B{row}"] = campaign_info.get("publisher", "")
-    row += 1
-    ws[f"A{row}"] = "Product:"
-    ws[f"B{row}"] = campaign_info.get("product", "")
-    
-    # Internal Setup Section
-    row = 10
     ws[f"A{row}"] = "INTERNAL SETUP & TARGETING"
-    ws[f"A{row}"].font = Font(bold=True, size=11, color="0078D4")
-    
+    ws[f"A{row}"].font = section_font
     row += 2
-    headers_setup = ["Field", "Value"]
-    for col, header in enumerate(headers_setup, 1):
+
+    for col, header in enumerate(["Field", "Value"], 1):
         cell = ws.cell(row=row, column=col)
         cell.value = header
-        cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
-        cell.font = Font(bold=True)
-    
+        cell.fill = header_fill
+        cell.font = header_font
     row += 1
+
     setup_fields = [
-        ("Seat ID", "280 - Monetize"),
-        ("Priority", "5-15"),
-        ("Frequency Cap", "Per product rules"),
-        ("Pacing", "Even / ASAP"),
-        ("KV Parameters", "KV pub=msn (MSN) | Direct (Outlook)"),
-        ("Line Item Type", "PG"),
-        ("Inventory Type", "Banner / Video / Native"),
-        ("Geo Targeting", "Country required"),
+        ("Seat ID",              product_config.get("seat", "280 - Monetize")),
+        ("Line Item Type",       product_config.get("line_item_type", "N/A")),
+        ("Revenue Type",         product_config.get("revenue_type", "CPM")),
+        ("Priority",             product_config.get("priority", "N/A")),
+        ("Frequency Cap",        product_config.get("frequency_cap", "N/A")),
+        ("Pacing",               product_config.get("pacing", "N/A")),
+        ("Inventory Type",       product_config.get("inventory_type",
+                                    resolve_inventory_type(campaign_info.get("format", "Banner")))),
+        ("Inventory Targeting",  product_config.get("inventory_targeting",
+                                    product_config.get("publisher_targeting", "N/A"))),
+        ("Supply",               product_config.get("supply",
+                                    product_config.get("supply_targeting", "N/A"))),
+        ("Ad Sizes",             product_config.get("ad_sizes", "N/A")),
+        ("Device Targeting",     product_config.get("device_targeting", "N/A")),
+        ("Creative Specs",       product_config.get("creative_specs", "N/A")),
+        ("Allow RTB",            str(product_config.get("allow_rtb", "N/A"))),
+        ("Underspend Catchup",   product_config.get("underspend_catchup", "N/A")),
+        ("Geo Targeting",        product_config.get("geo_targeting", "Country Targeting")),
     ]
-    
+
     for field_name, field_value in setup_fields:
         ws.cell(row=row, column=1).value = field_name
-        ws.cell(row=row, column=2).value = field_value
+        ws.cell(row=row, column=2).value = str(field_value)
         row += 1
-    
-    # QC Checklist
+
+    # ── QC CHECKLIST (mirrors unified_checklist from the UI) ─────────────────
     row += 2
     ws[f"A{row}"] = "QC CHECKLIST"
-    ws[f"A{row}"].font = Font(bold=True, size=11, color="0078D4")
-    
+    ws[f"A{row}"].font = section_font
     row += 2
-    total_impressions = sum(f.get("volume", 0) for f in flights_list)
-    first_flight = flights_list[0] if flights_list else {}
-    start = first_flight.get("start_date")
-    end = first_flight.get("end_date")
-    if isinstance(start, str):
-        from datetime import datetime
-        start = datetime.strptime(start, "%Y-%m-%d").date()
-    if isinstance(end, str):
-        from datetime import datetime
-        end = datetime.strptime(end, "%Y-%m-%d").date()
-    flight_days = (end - start).days + 1 if start and end else 0
-    daily_volume = total_impressions / flight_days if flight_days > 0 else 0
-    
-    qc_items = [
-        ("Delivery Risk Level", delivery_pressure_label),
-        ("Total Flights", len(flights_list)),
-        ("Flight Duration (days)", flight_days),
-        ("Est. Daily Impressions", f"{daily_volume:,.0f}"),
-        ("Total Impressions", f"{total_impressions:,.0f}"),
-        ("Rate Card Alignment", "⚠️ Verify before IO"),
-        ("Publisher Targeting", "KV / Direct Inventory"),
-        ("Date Window", f"{start} to {end}"),
-    ]
-    
-    headers_qc = ["Checklist Item", "Status / Value"]
-    for col, header in enumerate(headers_qc, 1):
+
+    for col, header in enumerate(["Checklist Item", "Status / Value"], 1):
         cell = ws.cell(row=row, column=col)
         cell.value = header
-        cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
-        cell.font = Font(bold=True)
-    
+        cell.fill = header_fill
+        cell.font = header_font
     row += 1
-    for item, value in qc_items:
-        ws.cell(row=row, column=1).value = item
-        ws.cell(row=row, column=2).value = value
+
+    for item_name, item_value in unified_checklist:
+        ws.cell(row=row, column=1).value = str(item_name)
+        ws.cell(row=row, column=2).value = str(item_value)
         row += 1
-    
-    # Adjust column widths
-    ws.column_dimensions['A'].width = 25
-    ws.column_dimensions['B'].width = 30
-    
+
+    # ── Column widths ────────────────────────────────────────────────────────
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 45
+
     return wb
 
 def create_excel_export(flights_list, campaign_info, delivery_pressure_label, product_config, cpm_rate, currency_sym, vcr_target=None, completed_views=None):
@@ -1789,7 +1767,10 @@ with col_export2:
 # Internal-Facing Excel Export
 with col_export3:
     # Create internal-facing Excel with targeting setup
-    internal_file = create_internal_excel_export(export_flights, st.session_state.campaign_details, delivery_pressure)
+    internal_file = create_internal_excel_export(
+        export_flights, st.session_state.campaign_details, delivery_pressure,
+        product_config, unified_checklist
+    )
     internal_bytes = BytesIO()
     internal_file.save(internal_bytes)
     internal_bytes.seek(0)
